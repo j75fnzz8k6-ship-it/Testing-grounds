@@ -2,167 +2,193 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>D&D Character Scroll</title>
+    <title>Mansion RPS Crawler</title>
     <style>
-        /* Aesthetic: Medieval Desk */
-        body { 
-            background: #3e2723; /* Dark wood desk color */
-            font-family: 'Georgia', serif; 
-            display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0;
-        }
-
-        .parchment { 
-            background-color: #f4e4bc; 
-            background-image: url('https://www.transparenttextures.com/patterns/aged-paper.png');
-            width: 500px; padding: 40px; border-radius: 5px;
-            box-shadow: 10px 10px 20px rgba(0,0,0,0.7), inset 0 0 100px rgba(0,0,0,0.1);
-            border: 2px solid #8b4513; color: #4e342e; text-align: center;
-        }
-
-        .page { display: none; }
-        .page.active { display: block; }
-
-        /* Inputs */
-        input { 
-            background: transparent; border: none; border-bottom: 1px solid #8b4513; 
-            font-family: 'Georgia', serif; font-size: 1.2rem; color: #4e342e; text-align: center; width: 80%;
-        }
-        input:focus { outline: none; background: #e0d0a0; }
-
-        button { 
-            background: #8b4513; color: #f4e4bc; border: 1px solid #5d2e0a;
-            padding: 8px 15px; cursor: pointer; font-family: 'Georgia', serif; margin: 10px;
-        }
-        button:hover { background: #5d2e0a; }
-
-        /* Character Sheet Style */
-        .sheet { text-align: left; border: 1px solid #8b4513; padding: 15px; }
-        .sheet h3 { border-bottom: 2px solid #8b4513; margin-top: 0; }
-        .sheet-row { display: flex; justify-content: space-between; margin: 5px 0; }
+        body { margin: 0; background: #222; display: flex; justify-content: center; align-items: center; height: 100vh; color: white; font-family: sans-serif; }
+        #gameContainer { position: relative; border: 4px solid #555; }
+        canvas { display: block; background: #333; }
+        #ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; background: rgba(0,0,0,0.8); flex-direction: column; align-items: center; justify-content: center; }
+        .hud { position: absolute; top: 10px; left: 10px; pointer-events: none; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; margin: 5px; }
     </style>
 </head>
 <body>
 
-<div class="parchment" id="main-container">
-    <!-- Start -->
-    <div id="page-start" class="page active">
-        <h1>The Adventurer's Scroll</h1>
-        <p>A new legend is to be written...</p>
-        <button onclick="nextPage('page-race')">Begin</button>
+<div id="gameContainer">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div class="hud" id="hud">
+        Wins Streak: 0 | Losses: 0 | Inventory: Rock: 0, Paper: 0, Scissor: 0
     </div>
-
-    <!-- Edit Pages -->
-    <div id="page-race" class="page">
-        <h2>Character Race</h2>
-        <input type="text" id="in-race" oninput="update('race', this.value)">
-        <br><button onclick="randomize('race')">Roll Race</button>
-        <br><button onclick="nextPage('page-gender')">Next</button>
-    </div>
-
-    <div id="page-gender" class="page">
-        <h2>Character Gender</h2>
-        <input type="text" id="in-gender" oninput="update('gender', this.value)">
-        <br><button onclick="randomize('gender')">Roll Gender</button>
-        <br><button onclick="nextPage('page-stats')">Next</button>
-    </div>
-
-    <div id="page-stats" class="page">
-        <h2>Ability Scores</h2>
-        <div id="stat-list"></div>
-        <button onclick="rollAllStats()">Roll All</button>
-        <br><button onclick="nextPage('page-class')">Next</button>
-    </div>
-
-    <div id="page-class" class="page">
-        <h2>Character Class</h2>
-        <input type="text" id="in-class" oninput="update('class', this.value)">
-        <br><button onclick="randomize('class')">Roll Class</button>
-        <br><button onclick="nextPage('page-background')">Next</button>
-    </div>
-
-    <div id="page-background" class="page">
-        <h2>Background</h2>
-        <input type="text" id="in-background" oninput="update('background', this.value)">
-        <br><button onclick="randomize('background')">Roll Background</button>
-        <br><button onclick="nextPage('page-complete')">Finish</button>
-    </div>
-
-    <!-- Completed Character Sheet -->
-    <div id="page-complete" class="page">
-        <h2>Final Record</h2>
-        <div class="sheet" id="final-sheet"></div>
-        <button onclick="location.reload()">Start New</button>
+    <div id="ui">
+        <h2 id="uiTitle">Challenge!</h2>
+        <div id="uiControls"></div>
     </div>
 </div>
 
 <script>
-    const options = {
-        race: ["Human", "Elf", "Dwarf", "Halfling", "Tiefling", "Dragonborn"],
-        gender: ["Male", "Female", "Non-Binary", "Agender"],
-        class: ["Fighter", "Wizard", "Rogue", "Cleric", "Barbarian", "Bard"],
-        background: ["Acolyte", "Criminal", "Soldier", "Sage", "Charlatan", "Hermit"]
-    };
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const ui = document.getElementById('ui');
+    const hud = document.getElementById('hud');
+    const uiTitle = document.getElementById('uiTitle');
+    const uiControls = document.getElementById('uiControls');
 
-    let char = {
-        race: "Human", gender: "Non-Binary", class: "Fighter", background: "Criminal",
-        stats: { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 }
-    };
+    // Game State
+    let player = { x: 400, y: 300, w: 20, h: 40, inv: { rock: 0, paper: 0, scissors: 0 }, streak: 0, losses: 0 };
+    let gameState = 'EXPLORING'; // EXPLORING, RPS
+    let roomContent = null; // { type: 'CHEST' or 'PERSON', item: 'rock'/'paper'/'scissors' }
+    let lastResult = '';
 
-    function update(key, val) { char[key] = val; }
-
-    function updateStat(stat, val) { char.stats[stat] = val; }
-
-    function randomize(type) {
-        const val = options[type][Math.floor(Math.random() * options[type].length)];
-        char[type] = val;
-        document.getElementById('in-' + type).value = val;
-    }
-
-    function rollAllStats() {
-        for(let s in char.stats) {
-            char.stats[s] = Math.floor(Math.random() * 12) + 6;
-        }
-        renderStats();
-    }
-
-    function renderStats() {
-        const div = document.getElementById('stat-list');
-        div.innerHTML = '';
-        for(let s in char.stats) {
-            div.innerHTML += `<div>${s}: <input type="number" value="${char.stats[s]}" onchange="updateStat('${s}', this.value)" style="width: 50px;"></div>`;
+    function generateRoom() {
+        const rand = Math.random();
+        if (rand > 0.5) {
+            const items = ['rock', 'paper', 'scissors'];
+            roomContent = { type: 'CHEST', item: items[Math.floor(Math.random() * 3)], x: 200 + Math.random()*400, y: 150 + Math.random()*300 };
+        } else {
+            roomContent = { type: 'PERSON', x: 200 + Math.random()*400, y: 150 + Math.random()*300 };
         }
     }
 
-    function nextPage(id) {
-        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-        document.getElementById(id).classList.add('active');
+    generateRoom();
+
+    // Input Handling
+    const keys = {};
+    window.addEventListener('keydown', e => keys[e.key] = true);
+    window.addEventListener('keyup', e => keys[e.key] = false);
+
+    function update() {
+        if (gameState !== 'EXPLORING') return;
+
+        if (keys['ArrowUp'] && player.y > 0) player.y -= 5;
+        if (keys['ArrowDown'] && player.y < 560) player.y += 5;
+        if (keys['ArrowLeft'] && player.x > 0) player.x -= 5;
+        if (keys['ArrowRight'] && player.x < 780) player.x += 5;
+
+        // Check for Room Transition (Walking into walls)
+        if (player.x <= 0 || player.x >= 780 || player.y <= 0 || player.y >= 560) {
+            player.x = 400; player.y = 300;
+            generateRoom();
+        }
+
+        // Check for collision
+        if (roomContent && Math.abs(player.x - roomContent.x) < 30 && Math.abs(player.y - roomContent.y) < 30) {
+            if (roomContent.type === 'CHEST') {
+                player.inv[roomContent.item]++;
+                roomContent = null;
+            } else {
+                startRPS();
+            }
+        }
+        updateHUD();
+    }
+
+    function updateHUD() {
+        hud.innerText = `Win Streak: ${player.streak} | Losses: ${player.losses}/3 | Inv: R:${player.inv.rock} P:${player.inv.paper} S:${player.inv.scissors}`;
+    }
+
+    function startRPS() {
+        gameState = 'RPS';
+        ui.style.display = 'flex';
+        uiTitle.innerText = "A Challenger Appears! Pick your move.";
+        uiControls.innerHTML = '';
+        ['rock', 'paper', 'scissors'].forEach(move => {
+            const btn = document.createElement('button');
+            btn.innerText = move.toUpperCase();
+            btn.onclick = () => playRPS(move);
+            uiControls.appendChild(btn);
+        });
+    }
+
+    function playRPS(playerChoice, forceWin = false) {
+        const moves = ['rock', 'paper', 'scissors'];
+        const cpuChoice = moves[Math.floor(Math.random() * 3)];
         
-        // Sync values if moving to a page with inputs
-        if(id.startsWith('page-')) {
-            const key = id.replace('page-', '');
-            if(options[key]) document.getElementById('in-' + key).value = char[key];
+        let win = false;
+        if (forceWin) {
+            win = true;
+            lastResult = "You used an item to cheat and WIN!";
+        } else {
+            if (playerChoice === cpuChoice) { lastResult = "Tie! Play again."; startRPS(); return; }
+            if ((playerChoice === 'rock' && cpuChoice === 'scissors') || 
+                (playerChoice === 'scissors' && cpuChoice === 'paper') || 
+                (playerChoice === 'paper' && cpuChoice === 'rock')) {
+                win = true;
+                lastResult = `You played ${playerChoice}, they played ${cpuChoice}. You Win!`;
+            } else {
+                win = false;
+                lastResult = `You played ${playerChoice}, they played ${cpuChoice}. You Lose!`;
+            }
+        }
+
+        if (win) {
+            player.streak++;
+            if (player.streak >= 10) {
+                alert("YOU ESCAPED THE MANSION! You won 10 in a row.");
+                location.reload();
+            }
+        } else {
+            player.streak = 0;
+            player.losses++;
+            if (player.losses >= 3) {
+                alert("GAME OVER. You lost 3 times.");
+                location.reload();
+            }
+        }
+
+        uiTitle.innerText = lastResult;
+        uiControls.innerHTML = '';
+        
+        if (!win && (player.inv.rock > 0 || player.inv.paper > 0 || player.inv.scissors > 0)) {
+            uiTitle.innerText += " (Use inventory to flip loss!)";
+            ['rock', 'paper', 'scissors'].forEach(item => {
+                if(player.inv[item] > 0) {
+                    const btn = document.createElement('button');
+                    btn.innerText = "Use " + item.toUpperCase();
+                    btn.onclick = () => { player.inv[item]--; playRPS(null, true); };
+                    uiControls.appendChild(btn);
+                }
+            });
         }
         
-        if(id === 'page-complete') showSheet();
+        const contBtn = document.createElement('button');
+        contBtn.innerText = "Continue Exploring";
+        contBtn.onclick = () => { ui.style.display = 'none'; gameState = 'EXPLORING'; generateRoom(); };
+        uiControls.appendChild(contBtn);
     }
 
-    function showSheet() {
-        let statsHtml = '';
-        for(let s in char.stats) statsHtml += `<div class="sheet-row"><span>${s}</span> <span>${char.stats[s]}</span></div>`;
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        document.getElementById('final-sheet').innerHTML = `
-            <h3>Character Profile</h3>
-            <p><strong>Race:</strong> ${char.race}</p>
-            <p><strong>Gender:</strong> ${char.gender}</p>
-            <p><strong>Class:</strong> ${char.class}</p>
-            <p><strong>Background:</strong> ${char.background}</p>
-            <h3>Stats</h3>
-            ${statsHtml}
-        `;
+        // Draw Room
+        if (roomContent) {
+            ctx.fillStyle = roomContent.type === 'CHEST' ? 'gold' : 'red';
+            ctx.fillRect(roomContent.x, roomContent.y, 30, 30);
+            ctx.fillStyle = 'white';
+            ctx.fillText(roomContent.type, roomContent.x, roomContent.y - 5);
+        }
+
+        // Draw Player (Stick Figure)
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(player.x + 10, player.y - 10, 10, 0, Math.PI * 2); // Head
+        ctx.moveTo(player.x + 10, player.y);
+        ctx.lineTo(player.x + 10, player.y + 20); // Body
+        ctx.moveTo(player.x + 10, player.y + 5);
+        ctx.lineTo(player.x - 5, player.y + 15); // Arm
+        ctx.moveTo(player.x + 10, player.y + 5);
+        ctx.lineTo(player.x + 25, player.y + 15); // Arm
+        ctx.moveTo(player.x + 10, player.y + 20);
+        ctx.lineTo(player.x - 5, player.y + 40); // Leg
+        ctx.moveTo(player.x + 10, player.y + 20);
+        ctx.lineTo(player.x + 25, player.y + 40); // Leg
+        ctx.stroke();
+
+        update();
+        requestAnimationFrame(draw);
     }
 
-    // Init
-    renderStats();
+    draw();
 </script>
 </body>
 </html>
