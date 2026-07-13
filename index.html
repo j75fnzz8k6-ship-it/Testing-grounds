@@ -3,15 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jenna: Your Coding Companion</title>
+    <title>Jenna - Thoughtful Companion</title>
     <style>
-        :root { --primary: #d2691e; --bg: #fdf5e6; }
+        :root { --primary: #d2691e; }
         body { font-family: 'Segoe UI', sans-serif; background: #eee; display: flex; justify-content: center; height: 100vh; margin: 0; }
-        #chat-container { width: 100%; max-width: 600px; height: 100vh; background: white; display: flex; flex-direction: column; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
+        #chat-container { width: 100%; max-width: 500px; height: 100vh; background: white; display: flex; flex-direction: column; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
         #chat-box { flex: 1; padding: 20px; overflow-y: auto; background: #fffaf0; }
-        .message { margin: 10px 0; padding: 12px; border-radius: 12px; max-width: 85%; line-height: 1.4; }
+        .message { margin: 10px 0; padding: 12px; border-radius: 12px; max-width: 85%; animation: fadeIn 0.3s; }
         .user { background: #e0e0e0; align-self: flex-end; margin-left: auto; }
         .jenna { background: #ffe4b5; border: 1px solid var(--primary); }
+        .thinking { font-style: italic; color: #888; font-size: 0.9em; margin-bottom: 5px; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; } }
         #input-area { padding: 15px; border-top: 2px solid #ddd; display: flex; gap: 10px; }
         input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
         button { padding: 10px 20px; background: var(--primary); color: white; border: none; border-radius: 5px; cursor: pointer; }
@@ -22,66 +24,80 @@
 <div id="chat-container">
     <div id="chat-box"></div>
     <div id="input-area">
-        <input type="text" id="user-input" placeholder="Ask about HTML or chat with me...">
-        <button onclick="processInput()">Send</button>
+        <input type="text" id="user-input" placeholder="Chat with Jenna...">
+        <button onclick="handleUserSend()">Send</button>
     </div>
 </div>
 
 <script>
-    // 1. The Knowledge Base (Expand this to make her "fluent" in everything)
-    const knowledgeBase = {
-        "html": "HTML (HyperText Markup Language) is the skeleton of the web. It uses tags like <div>, <p>, and <h1> to structure content. Want to see a basic template?",
-        "css": "CSS is what makes the web beautiful! It handles styling, colors, and layouts. Think of it as the 'clothes' for the HTML 'skeleton'.",
-        "javascript": "JavaScript is the brain! It makes pages interactive—like when you click a button and something happens.",
-        "variable": "A variable is like a box with a label where you store data, like 'let age = 20;'.",
-        "function": "A function is a reusable block of code designed to perform a particular task. You define it once, and call it whenever you need it!",
-        "div": "The <div> tag is a container used to group elements together so you can style them or manipulate them with JS."
+    // --- JENNA'S BRAIN & STATE ---
+    let state = {
+        context: null, // Keeps track of what we are talking about
+        lastTopic: null
     };
 
-    const history = [];
-
-    function processInput() {
-        const inputField = document.getElementById('user-input');
-        const text = inputField.value.trim();
-        if (!text) return;
-
-        history.push({ role: 'user', text: text });
-        appendMessage('You', text);
-        
-        // Jenna's "Thinking"
-        setTimeout(() => {
-            const response = generateResponse(text);
-            history.push({ role: 'Jenna', text: response });
-            appendMessage('Jenna', response);
-        }, 500);
-
-        inputField.value = '';
+    function appendMessage(sender, text, isThinking = false) {
+        const box = document.getElementById('chat-box');
+        if (isThinking) {
+            const div = document.createElement('div');
+            div.className = 'thinking';
+            div.id = 'thinking-msg';
+            div.innerText = "Jenna is thinking...";
+            box.appendChild(div);
+        } else {
+            const thinking = document.getElementById('thinking-msg');
+            if (thinking) thinking.remove();
+            const div = document.createElement('div');
+            div.className = `message ${sender.toLowerCase()}`;
+            div.innerText = text;
+            box.appendChild(div);
+        }
+        box.scrollTop = box.scrollHeight;
     }
 
-    function generateResponse(input) {
-        const lower = input.toLowerCase();
+    function handleUserSend() {
+        const input = document.getElementById('user-input');
+        const text = input.value.trim();
+        if (!text) return;
+
+        appendMessage('You', text);
+        input.value = '';
         
-        // Check Knowledge Base first
-        for (let key in knowledgeBase) {
-            if (lower.includes(key)) {
-                return `*Adjusts glasses* Great question! ${knowledgeBase[key]}`;
+        // Show she is "thinking"
+        appendMessage('Jenna', '', true);
+        
+        setTimeout(() => {
+            const response = generateThoughtfulResponse(text.toLowerCase());
+            appendMessage('Jenna', response);
+        }, 1200); // Artificial delay to simulate "thought"
+    }
+
+    function generateThoughtfulResponse(input) {
+        // Yes/No logic based on state
+        if (input === 'yes') {
+            if (state.context === 'offer_lesson') {
+                state.context = 'teaching_html';
+                return "Perfect! Let's start with HTML. Every web page is wrapped in <html> tags. Want to try writing your first header?";
+            }
+        }
+        if (input === 'no') {
+            if (state.context === 'offer_lesson') {
+                state.context = null;
+                return "That's okay! We can just chat instead. What's on your mind?";
             }
         }
 
-        // Persona Responses
-        if (lower.includes("hi") || lower.includes("hello")) return "Hello! *tail wags* I'm Jenna, your friendly fox coder. What are we building today?";
-        if (lower.includes("how are you")) return "I'm doing great! Just processing data and keeping my ears sharp for your next question.";
+        // Logic for "Free Thought" (Topic Association)
+        if (input.includes('html')) {
+            state.context = 'offer_lesson';
+            return "*Ears perk up* I love HTML! It's the building block of everything. Would you like me to teach you the basics?";
+        }
         
-        return "I'm not quite sure about that one, but I'm learning! Ask me about HTML, CSS, or JavaScript, and I'll do my best to explain.";
-    }
+        if (input.includes('hello') || input.includes('hi')) {
+            return "Hey there! *swishes tail* I've been thinking about code all day. What are you working on?";
+        }
 
-    function appendMessage(sender, text) {
-        const box = document.getElementById('chat-box');
-        const div = document.createElement('div');
-        div.className = `message ${sender.toLowerCase()}`;
-        div.innerText = `${sender}: ${text}`;
-        box.appendChild(div);
-        box.scrollTop = box.scrollHeight;
+        return "That's a fascinating thought... *tilts head* Could you explain a bit more about what you mean? I want to make sure I understand you correctly.";
     }
 </script>
 </body>
