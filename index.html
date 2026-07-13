@@ -49,8 +49,8 @@
             furniture.push({ x: Math.random() * 700 + 50, y: Math.random() * 500 + 50, w: 50, h: 50 });
         }
         
-        // Spawn New Entity (20% chance for chest)
-        const isChest = Math.random() < 0.2;
+        // Spawn New Entity
+        const isChest = Math.random() < 0.1;
         entity = { 
             type: isChest ? 'CHEST' : 'MONSTER', 
             x: 100 + Math.random() * 600, 
@@ -97,4 +97,127 @@
         if (!entity || !entity.active || entity.type === 'CHEST') {
             if (player.x <= 0 || player.x >= 780 || player.y <= 0 || player.y >= 560) {
                 // Reset player position slightly inward
-                player.x = (player.x <= 0) ? 750 : (player.
+                player.x = (player.x <= 0) ? 750 : (player.x >= 780) ? 50 : player.x;
+                player.y = (player.y <= 0) ? 550 : (player.y >= 560) ? 50 : player.y;
+                generateRoom();
+            }
+        }
+        updateHUD();
+    }
+
+    function updateHUD() {
+        hud.innerText = `Streak: ${player.streak} | Losses: ${player.losses}/3 | Inv: R:${player.inv.rock} P:${player.inv.paper} S:${player.inv.scissors}`;
+    }
+
+    function startRPS() {
+        gameState = 'RPS';
+        ui.style.display = 'flex';
+        uiTitle.innerText = "A Monster blocks your path!";
+        uiControls.innerHTML = '';
+        ['rock', 'paper', 'scissors'].forEach(move => {
+            const btn = document.createElement('button');
+            btn.innerText = move.toUpperCase();
+            btn.onclick = () => playRPS(move);
+            uiControls.appendChild(btn);
+        });
+    }
+
+    function playRPS(playerChoice) {
+        const moves = ['rock', 'paper', 'scissors'];
+        const cpuChoice = moves[Math.floor(Math.random() * 3)];
+        
+        if (playerChoice === cpuChoice) {
+            uiTitle.innerText = "Tie! Try again.";
+            return;
+        }
+
+        const isWin = (playerChoice === 'rock' && cpuChoice === 'scissors') || 
+                      (playerChoice === 'scissors' && cpuChoice === 'paper') || 
+                      (playerChoice === 'paper' && cpuChoice === 'rock');
+
+        if (isWin) {
+            resolveRound('WIN');
+        } else {
+            showLossOptions();
+        }
+    }
+
+    function showLossOptions() {
+        uiTitle.innerText = "You lost the round!";
+        uiControls.innerHTML = '';
+        
+        const hasItems = player.inv.rock > 0 || player.inv.paper > 0 || player.inv.scissors > 0;
+        if (hasItems) {
+            uiTitle.innerText += " (Use inventory to counter!)";
+            ['rock', 'paper', 'scissors'].forEach(item => {
+                if(player.inv[item] > 0) {
+                    const btn = document.createElement('button');
+                    btn.innerText = "Use " + item.toUpperCase();
+                    btn.onclick = () => { player.inv[item]--; resolveRound('CHEATED_WIN'); };
+                    uiControls.appendChild(btn);
+                }
+            });
+        }
+
+        const btn = document.createElement('button');
+        btn.innerText = "Accept Defeat";
+        btn.onclick = () => resolveRound('LOSS');
+        uiControls.appendChild(btn);
+    }
+
+    function resolveRound(result) {
+        if (result === 'WIN') {
+            player.streak++;
+            entity.active = false;
+        } else if (result === 'LOSS') {
+            player.streak = 0;
+            player.losses++;
+            entity.active = false;
+        } else if (result === 'CHEATED_WIN') {
+            entity.active = false;
+        }
+
+        if (player.streak >= 10) { alert("YOU ESCAPED THE MANSION!"); location.reload(); }
+        if (player.losses >= 3) { alert("GAME OVER."); location.reload(); }
+        
+        ui.style.display = 'none';
+        gameState = 'EXPLORING';
+    }
+
+    function drawStickFigure(x, y, color) {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(x + 10, y - 10, 10, 0, Math.PI * 2); 
+        ctx.moveTo(x + 10, y); ctx.lineTo(x + 10, y + 20);
+        ctx.moveTo(x + 10, y + 5); ctx.lineTo(x - 5, y + 15);
+        ctx.moveTo(x + 10, y + 5); ctx.lineTo(x + 25, y + 15);
+        ctx.moveTo(x + 10, y + 20); ctx.lineTo(x + 5, y + 40);
+        ctx.moveTo(x + 10, y + 20); ctx.lineTo(x + 15, y + 40);
+        ctx.stroke();
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        furniture.forEach(f => {
+            ctx.fillStyle = '#333'; ctx.fillRect(f.x, f.y, f.w, f.h);
+            ctx.strokeStyle = '#555'; ctx.strokeRect(f.x, f.y, f.w, f.h);
+        });
+
+        if (entity && entity.active) {
+            if (entity.type === 'CHEST') {
+                ctx.fillStyle = 'gold'; ctx.fillRect(entity.x, entity.y, 20, 20);
+            } else {
+                drawStickFigure(entity.x, entity.y, 'red');
+            }
+        }
+
+        drawStickFigure(player.x, player.y, 'white');
+        update();
+        requestAnimationFrame(draw);
+    }
+
+    draw();
+</script>
+</body>
+</html>
