@@ -2,133 +2,167 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>D&D Character Generator</title>
+    <title>D&D Character Scroll</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #2c3e50; color: #ecf0f1; display: flex; justify-content: center; padding: 20px; }
-        .container { background: #34495e; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); width: 100%; max-width: 500px; text-align: center; }
+        /* Aesthetic: Medieval Desk */
+        body { 
+            background: #3e2723; /* Dark wood desk color */
+            font-family: 'Georgia', serif; 
+            display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0;
+        }
+
+        .parchment { 
+            background-color: #f4e4bc; 
+            background-image: url('https://www.transparenttextures.com/patterns/aged-paper.png');
+            width: 500px; padding: 40px; border-radius: 5px;
+            box-shadow: 10px 10px 20px rgba(0,0,0,0.7), inset 0 0 100px rgba(0,0,0,0.1);
+            border: 2px solid #8b4513; color: #4e342e; text-align: center;
+        }
+
         .page { display: none; }
         .page.active { display: block; }
-        h1 { color: #f1c40f; }
-        button { background: #e67e22; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 4px; margin-top: 20px; font-size: 16px; }
-        button:hover { background: #d35400; }
-        .stat-row { display: flex; justify-content: space-between; margin: 10px 0; align-items: center; }
-        .stat-input { width: 50px; background: #2c3e50; border: 1px solid #7f8c8d; color: white; text-align: center; padding: 5px; border-radius: 4px; }
-        .result-box { text-align: left; background: #2c3e50; padding: 15px; border-radius: 5px; }
+
+        /* Inputs */
+        input { 
+            background: transparent; border: none; border-bottom: 1px solid #8b4513; 
+            font-family: 'Georgia', serif; font-size: 1.2rem; color: #4e342e; text-align: center; width: 80%;
+        }
+        input:focus { outline: none; background: #e0d0a0; }
+
+        button { 
+            background: #8b4513; color: #f4e4bc; border: 1px solid #5d2e0a;
+            padding: 8px 15px; cursor: pointer; font-family: 'Georgia', serif; margin: 10px;
+        }
+        button:hover { background: #5d2e0a; }
+
+        /* Character Sheet Style */
+        .sheet { text-align: left; border: 1px solid #8b4513; padding: 15px; }
+        .sheet h3 { border-bottom: 2px solid #8b4513; margin-top: 0; }
+        .sheet-row { display: flex; justify-content: space-between; margin: 5px 0; }
     </style>
 </head>
 <body>
 
-<div class="container">
+<div class="parchment" id="main-container">
+    <!-- Start -->
     <div id="page-start" class="page active">
-        <h1>D&D Character Gen</h1>
-        <p>Let's build your next adventure.</p>
-        <button onclick="nextPage('page-race')">Start Generating</button>
+        <h1>The Adventurer's Scroll</h1>
+        <p>A new legend is to be written...</p>
+        <button onclick="nextPage('page-race')">Begin</button>
     </div>
 
+    <!-- Edit Pages -->
     <div id="page-race" class="page">
-        <h2>Select Race</h2>
-        <h3 id="display-race">Human</h3>
-        <button onclick="randomize('race')">Randomize</button>
-        <button onclick="nextPage('page-gender')">Next</button>
+        <h2>Character Race</h2>
+        <input type="text" id="in-race" oninput="update('race', this.value)">
+        <br><button onclick="randomize('race')">Roll Race</button>
+        <br><button onclick="nextPage('page-gender')">Next</button>
     </div>
 
     <div id="page-gender" class="page">
-        <h2>Select Gender</h2>
-        <h3 id="display-gender">Non-Binary</h3>
-        <button onclick="randomize('gender')">Randomize</button>
-        <button onclick="nextPage('page-stats')">Next</button>
+        <h2>Character Gender</h2>
+        <input type="text" id="in-gender" oninput="update('gender', this.value)">
+        <br><button onclick="randomize('gender')">Roll Gender</button>
+        <br><button onclick="nextPage('page-stats')">Next</button>
     </div>
 
     <div id="page-stats" class="page">
-        <h2>Assign Stats</h2>
-        <div id="stat-container"></div>
-        <button onclick="randomize('stats')">Re-Roll Stats</button>
-        <button onclick="nextPage('page-class')">Next</button>
+        <h2>Ability Scores</h2>
+        <div id="stat-list"></div>
+        <button onclick="rollAllStats()">Roll All</button>
+        <br><button onclick="nextPage('page-class')">Next</button>
     </div>
 
     <div id="page-class" class="page">
-        <h2>Select Class</h2>
-        <h3 id="display-class">Fighter</h3>
-        <button onclick="randomize('class')">Randomize</button>
-        <button onclick="nextPage('page-background')">Next</button>
+        <h2>Character Class</h2>
+        <input type="text" id="in-class" oninput="update('class', this.value)">
+        <br><button onclick="randomize('class')">Roll Class</button>
+        <br><button onclick="nextPage('page-background')">Next</button>
     </div>
 
     <div id="page-background" class="page">
         <h2>Background</h2>
-        <h3 id="display-background">Criminal</h3>
-        <button onclick="randomize('background')">Randomize</button>
-        <button onclick="nextPage('page-complete')">Finish</button>
+        <input type="text" id="in-background" oninput="update('background', this.value)">
+        <br><button onclick="randomize('background')">Roll Background</button>
+        <br><button onclick="nextPage('page-complete')">Finish</button>
     </div>
 
+    <!-- Completed Character Sheet -->
     <div id="page-complete" class="page">
-        <h2>Your Character</h2>
-        <div class="result-box" id="final-summary"></div>
-        <button onclick="location.reload()">Generate New</button>
+        <h2>Final Record</h2>
+        <div class="sheet" id="final-sheet"></div>
+        <button onclick="location.reload()">Start New</button>
     </div>
 </div>
 
 <script>
-    const data = {
-        races: ["Human", "Elf", "Dwarf", "Halfling", "Tiefling", "Dragonborn", "Half-Orc"],
-        genders: ["Male", "Female", "Non-Binary", "Agender"],
-        classes: ["Fighter", "Wizard", "Rogue", "Cleric", "Barbarian", "Bard", "Paladin"],
-        backgrounds: ["Acolyte", "Criminal", "Soldier", "Sage", "Charlatan", "Hermit"],
-        stats: ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"]
+    const options = {
+        race: ["Human", "Elf", "Dwarf", "Halfling", "Tiefling", "Dragonborn"],
+        gender: ["Male", "Female", "Non-Binary", "Agender"],
+        class: ["Fighter", "Wizard", "Rogue", "Cleric", "Barbarian", "Bard"],
+        background: ["Acolyte", "Criminal", "Soldier", "Sage", "Charlatan", "Hermit"]
     };
 
-    let character = {
-        race: "Human",
-        gender: "Non-Binary",
-        stats: { Strength: 10, Dexterity: 10, Constitution: 10, Intelligence: 10, Wisdom: 10, Charisma: 10 },
-        class: "Fighter",
-        background: "Criminal"
+    let char = {
+        race: "Human", gender: "Non-Binary", class: "Fighter", background: "Criminal",
+        stats: { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 }
     };
 
-    function nextPage(pageId) {
-        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-        document.getElementById(pageId).classList.add('active');
-        if(pageId === 'page-complete') showFinal();
-    }
+    function update(key, val) { char[key] = val; }
+
+    function updateStat(stat, val) { char.stats[stat] = val; }
 
     function randomize(type) {
-        if(type === 'stats') {
-            data.stats.forEach(s => character.stats[s] = Math.floor(Math.random() * 11) + 8);
-            renderStats();
-        } else {
-            const arr = data[type + 's'] || data[type];
-            character[type] = arr[Math.floor(Math.random() * arr.length)];
-            document.getElementById('display-' + type).innerText = character[type];
+        const val = options[type][Math.floor(Math.random() * options[type].length)];
+        char[type] = val;
+        document.getElementById('in-' + type).value = val;
+    }
+
+    function rollAllStats() {
+        for(let s in char.stats) {
+            char.stats[s] = Math.floor(Math.random() * 12) + 6;
         }
+        renderStats();
     }
 
     function renderStats() {
-        const container = document.getElementById('stat-container');
-        container.innerHTML = '';
-        for(let stat in character.stats) {
-            container.innerHTML += `
-                <div class="stat-row">
-                    <label>${stat}:</label>
-                    <input type="number" class="stat-input" value="${character.stats[stat]}" 
-                    onchange="character.stats['${stat}'] = this.value">
-                </div>`;
+        const div = document.getElementById('stat-list');
+        div.innerHTML = '';
+        for(let s in char.stats) {
+            div.innerHTML += `<div>${s}: <input type="number" value="${char.stats[s]}" onchange="updateStat('${s}', this.value)" style="width: 50px;"></div>`;
         }
     }
 
-    function showFinal() {
-        let statsText = Object.entries(character.stats).map(([k,v]) => `${k}: ${v}`).join('<br>');
-        document.getElementById('final-summary').innerHTML = `
-            <p><strong>Race:</strong> ${character.race}</p>
-            <p><strong>Gender:</strong> ${character.gender}</p>
-            <p><strong>Class:</strong> ${character.class}</p>
-            <p><strong>Background:</strong> ${character.background}</p>
-            <p><strong>Stats:</strong><br>${statsText}</p>
+    function nextPage(id) {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        
+        // Sync values if moving to a page with inputs
+        if(id.startsWith('page-')) {
+            const key = id.replace('page-', '');
+            if(options[key]) document.getElementById('in-' + key).value = char[key];
+        }
+        
+        if(id === 'page-complete') showSheet();
+    }
+
+    function showSheet() {
+        let statsHtml = '';
+        for(let s in char.stats) statsHtml += `<div class="sheet-row"><span>${s}</span> <span>${char.stats[s]}</span></div>`;
+        
+        document.getElementById('final-sheet').innerHTML = `
+            <h3>Character Profile</h3>
+            <p><strong>Race:</strong> ${char.race}</p>
+            <p><strong>Gender:</strong> ${char.gender}</p>
+            <p><strong>Class:</strong> ${char.class}</p>
+            <p><strong>Background:</strong> ${char.background}</p>
+            <h3>Stats</h3>
+            ${statsHtml}
         `;
     }
 
-    // Initialize
+    // Init
     renderStats();
 </script>
-
 </body>
 </html>
