@@ -7,7 +7,7 @@
         body { margin: 0; background: #1a1a1a; display: flex; justify-content: center; align-items: center; height: 100vh; color: #eee; font-family: 'Courier New', Courier, monospace; }
         #gameContainer { position: relative; border: 4px solid #444; }
         canvas { display: block; background: #222; }
-        #ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; background: rgba(0,0,0,0.85); flex-direction: column; align-items: center; justify-content: center; }
+        #ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; background: rgba(0,0,0,0.85); flex-direction: column; align-items: center; justify-content: center; z-index: 10; }
         .hud { position: absolute; top: 10px; left: 10px; pointer-events: none; background: rgba(0,0,0,0.5); padding: 5px; }
         button { padding: 10px 20px; font-size: 16px; cursor: pointer; margin: 5px; background: #444; color: white; border: 1px solid #777; }
         button:hover { background: #666; }
@@ -40,12 +40,23 @@
     let furniture = [];
 
     function generateRoom() {
+        // Clear old data
         furniture = [];
+        entity = null; 
+
+        // Generate Furniture
         for(let i=0; i<4; i++) {
             furniture.push({ x: Math.random() * 700 + 50, y: Math.random() * 500 + 50, w: 50, h: 50 });
         }
-        const isChest = Math.random() < 0.1;
-        entity = { type: isChest ? 'CHEST' : 'MONSTER', x: 100 + Math.random() * 600, y: 100 + Math.random() * 400, active: true };
+        
+        // Spawn New Entity (20% chance for chest)
+        const isChest = Math.random() < 0.2;
+        entity = { 
+            type: isChest ? 'CHEST' : 'MONSTER', 
+            x: 100 + Math.random() * 600, 
+            y: 100 + Math.random() * 400, 
+            active: true 
+        };
     }
 
     generateRoom();
@@ -57,148 +68,33 @@
     function update() {
         if (gameState !== 'EXPLORING') return;
 
+        // Player Movement
         if (keys['ArrowUp'] && player.y > 0) player.y -= 5;
         if (keys['ArrowDown'] && player.y < 560) player.y += 5;
         if (keys['ArrowLeft'] && player.x > 0) player.x -= 5;
         if (keys['ArrowRight'] && player.x < 780) player.x += 5;
 
+        // Monster Logic
         if (entity && entity.type === 'MONSTER' && entity.active) {
-            entity.x += (player.x - entity.x) * 0.015;
-            entity.y += (player.y - entity.y) * 0.015;
-        }
+            // Monster Chase Speed
+            entity.x += (player.x - entity.x) * 0.01;
+            entity.y += (player.y - entity.y) * 0.01;
 
-        if (entity && entity.active && Math.abs(player.x - entity.x) < 30 && Math.abs(player.y - entity.y) < 30) {
-            if (entity.type === 'CHEST') {
+            // Collision check
+            if (Math.abs(player.x - entity.x) < 30 && Math.abs(player.y - entity.y) < 30) {
+                startRPS();
+            }
+        } else if (entity && entity.type === 'CHEST' && entity.active) {
+             if (Math.abs(player.x - entity.x) < 30 && Math.abs(player.y - entity.y) < 30) {
                 const items = ['rock', 'paper', 'scissors'];
                 player.inv[items[Math.floor(Math.random() * 3)]]++;
                 entity.active = false;
-            } else {
-                startRPS();
-            }
-        }
-        updateHUD();
-    }
-
-    function updateHUD() {
-        hud.innerText = `Streak: ${player.streak} | Losses: ${player.losses}/3 | Inv: R:${player.inv.rock} P:${player.inv.paper} S:${player.inv.scissors}`;
-    }
-
-    function startRPS() {
-        gameState = 'RPS';
-        ui.style.display = 'flex';
-        uiTitle.innerText = "A Monster blocks your path!";
-        uiControls.innerHTML = '';
-        ['rock', 'paper', 'scissors'].forEach(move => {
-            const btn = document.createElement('button');
-            btn.innerText = move.toUpperCase();
-            btn.onclick = () => playRPS(move);
-            uiControls.appendChild(btn);
-        });
-    }
-
-    function playRPS(playerChoice) {
-        const moves = ['rock', 'paper', 'scissors'];
-        const cpuChoice = moves[Math.floor(Math.random() * 3)];
-        
-        if (playerChoice === cpuChoice) {
-            uiTitle.innerText = "Tie! Go again.";
-            return;
-        }
-
-        const isWin = (playerChoice === 'rock' && cpuChoice === 'scissors') || 
-                      (playerChoice === 'scissors' && cpuChoice === 'paper') || 
-                      (playerChoice === 'paper' && cpuChoice === 'rock');
-
-        if (isWin) {
-            resolveRound('WIN');
-        } else {
-            showLossOptions();
-        }
-    }
-
-    function showLossOptions() {
-        uiTitle.innerText = "You lost the round!";
-        uiControls.innerHTML = '';
-        
-        // Option to cheat
-        const hasItems = player.inv.rock > 0 || player.inv.paper > 0 || player.inv.scissors > 0;
-        if (hasItems) {
-            uiTitle.innerText += " (Use inventory to survive)";
-            ['rock', 'paper', 'scissors'].forEach(item => {
-                if(player.inv[item] > 0) {
-                    const btn = document.createElement('button');
-                    btn.innerText = "Use " + item.toUpperCase();
-                    btn.onclick = () => { player.inv[item]--; resolveRound('CHEATED_WIN'); };
-                    uiControls.appendChild(btn);
-                }
-            });
-        }
-
-        // Option to accept defeat
-        const btn = document.createElement('button');
-        btn.innerText = "Accept Defeat";
-        btn.onclick = () => resolveRound('LOSS');
-        uiControls.appendChild(btn);
-    }
-
-    function resolveRound(result) {
-        if (result === 'WIN') {
-            player.streak++;
-            entity.active = false;
-        } else if (result === 'LOSS') {
-            player.streak = 0;
-            player.losses++;
-            entity.active = false;
-        } else if (result === 'CHEATED_WIN') {
-            // No streak change, no loss added
-            entity.active = false;
-        }
-
-        if (player.streak >= 10) { alert("YOU ESCAPED!"); location.reload(); }
-        if (player.losses >= 3) { alert("GAME OVER."); location.reload(); }
-        
-        ui.style.display = 'none';
-        gameState = 'EXPLORING';
-    }
-
-    function drawStickFigure(x, y, color) {
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        // Head
-        ctx.arc(x + 10, y - 10, 10, 0, Math.PI * 2); 
-        // Body
-        ctx.moveTo(x + 10, y); ctx.lineTo(x + 10, y + 20);
-        // Arms
-        ctx.moveTo(x + 10, y + 5); ctx.lineTo(x - 5, y + 15);
-        ctx.moveTo(x + 10, y + 5); ctx.lineTo(x + 25, y + 15);
-        // Legs (FIXED)
-        ctx.moveTo(x + 10, y + 20); ctx.lineTo(x + 5, y + 40);
-        ctx.moveTo(x + 10, y + 20); ctx.lineTo(x + 15, y + 40);
-        ctx.stroke();
-    }
-
-    function draw() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        furniture.forEach(f => {
-            ctx.fillStyle = '#333'; ctx.fillRect(f.x, f.y, f.w, f.h);
-            ctx.strokeStyle = '#555'; ctx.strokeRect(f.x, f.y, f.w, f.h);
-        });
-
-        if (entity && entity.active) {
-            if (entity.type === 'CHEST') {
-                ctx.fillStyle = 'gold'; ctx.fillRect(entity.x, entity.y, 20, 20);
-            } else {
-                drawStickFigure(entity.x, entity.y, 'red');
+                alert("Found an item!");
             }
         }
 
-        drawStickFigure(player.x, player.y, 'white');
-        update();
-        requestAnimationFrame(draw);
-    }
-
-    draw();
-</script>
-</body>
-</html>
+        // Room Transition (Only if no active monster)
+        if (!entity || !entity.active || entity.type === 'CHEST') {
+            if (player.x <= 0 || player.x >= 780 || player.y <= 0 || player.y >= 560) {
+                // Reset player position slightly inward
+                player.x = (player.x <= 0) ? 750 : (player.
