@@ -3,105 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Heroclix Team Builder</title>
+    <title>3D Interactive Character</title>
     <style>
-        :root { --primary: #2c3e50; --accent: #e74c3c; }
-        body { font-family: sans-serif; background: #f4f4f9; padding: 20px; }
-        .container { max-width: 800px; margin: auto; }
-        
-        /* Card Flip Styles */
-        .card-stage { width: 300px; height: 400px; perspective: 1000px; margin: 20px auto; cursor: pointer; }
-        .card-inner { position: relative; width: 100%; height: 100%; text-align: center; transition: transform 0.6s; transform-style: preserve-3d; }
-        .card-stage.flipped .card-inner { transform: rotateY(180deg); }
-        .front, .back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
-        .back { transform: rotateY(180deg); }
-        img { width: 100%; height: 100%; object-fit: cover; }
-
-        /* UI Elements */
-        .library, .team-builder { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        button { padding: 10px 15px; margin: 5px; cursor: pointer; border: none; border-radius: 4px; background: var(--primary); color: white; }
-        .stats { font-weight: bold; color: var(--accent); }
-        .hidden { display: none; }
+        body { margin: 0; overflow: hidden; background-color: #000; }
+        canvas { display: block; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>Heroclix Manager</h1>
-
-    <div class="library">
-        <h2>Available Cards</h2>
-        <div id="library-list"></div>
-    </div>
-
-    <div class="team-builder">
-        <h2>My Team (Points: <span id="total-points">0</span>)</h2>
-        <div id="active-card-container">
-            </div>
-        <div id="nav-controls">
-            <button onclick="changeCard(-1)">Previous</button>
-            <button onclick="changeCard(1)">Next</button>
-        </div>
-    </div>
-</div>
-
-<script>
-    // 1. DATA: Add your cards here
-    let cards = [
-        { id: 1, name: "Spider-Man", points: 75, front: "https://via.placeholder.com/300x400/3498db/ffffff?text=Spider-Man+Front", back: "https://via.placeholder.com/300x400/2980b9/ffffff?text=Spider-Man+Back" },
-        { id: 2, name: "Iron Man", points: 120, front: "https://via.placeholder.com/300x400/e74c3c/ffffff?text=Iron-Man+Front", back: "https://via.placeholder.com/300x400/c0392b/ffffff?text=Iron-Man+Back" },
-        { id: 3, name: "Batman", points: 90, front: "https://via.placeholder.com/300x400/2c3e50/ffffff?text=Batman+Front", back: "https://via.placeholder.com/300x400/34495e/ffffff?text=Batman+Back" }
-    ];
-
-    let myTeam = [];
-    let currentViewIndex = 0;
-
-    // 2. INITIALIZATION: Sort Alpha and Render
-    cards.sort((a, b) => a.name.localeCompare(b.name));
-
-    function renderLibrary() {
-        const list = document.getElementById('library-list');
-        list.innerHTML = cards.map(c => `<button onclick="addToTeam(${c.id})">Add ${c.name} (${c.points} pts)</button>`).join('');
-    }
-
-    // 3. LOGIC: Manage Team
-    function addToTeam(id) {
-        const card = cards.find(c => c.id === id);
-        myTeam.push(card);
-        updateTeamView();
-    }
-
-    function updateTeamView() {
-        const total = myTeam.reduce((sum, c) => sum + c.points, 0);
-        document.getElementById('total-points').innerText = total;
-        renderActiveCard();
-    }
-
-    function renderActiveCard() {
-        const container = document.getElementById('active-card-container');
-        if (myTeam.length === 0) {
-            container.innerHTML = "<p>Select cards to start your team.</p>";
-            return;
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
         }
-        const card = myTeam[currentViewIndex];
-        container.innerHTML = `
-            <div class="card-stage" onclick="this.classList.toggle('flipped')">
-                <div class="card-inner">
-                    <div class="front"><img src="${card.front}"></div>
-                    <div class="back"><img src="${card.back}"></div>
-                </div>
-            </div>
-            <p><strong>${card.name}</strong></p>
-        `;
-    }
+    </script>
 
-    function changeCard(dir) {
-        if (myTeam.length === 0) return;
-        currentViewIndex = (currentViewIndex + dir + myTeam.length) % myTeam.length;
-        renderActiveCard();
-    }
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-    renderLibrary();
-</script>
+        // 1. Setup Scene
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // 2. Add Lighting
+        const light = new THREE.DirectionalLight(0xffffff, 1);
+        light.position.set(1, 1, 1);
+        scene.add(light);
+        scene.add(new THREE.AmbientLight(0x404040));
+
+        // 3. Zoom/Rotate Interaction
+        const controls = new OrbitControls(camera, renderer.domElement);
+        camera.position.z = 5;
+
+        // 4. Load Model
+        let mixer;
+        const loader = new GLTFLoader();
+        loader.load('path_to_your_model.glb', (gltf) => {
+            const model = gltf.scene;
+            scene.add(model);
+
+            // Animation Handling
+            mixer = new THREE.AnimationMixer(model);
+            gltf.animations.forEach((clip) => {
+                mixer.clipAction(clip).play();
+            });
+        });
+
+        // 5. Animation Loop
+        const clock = new THREE.Clock();
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            if (mixer) mixer.update(delta);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Responsive Resizing
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
 </body>
 </html>
