@@ -4,12 +4,13 @@
     <meta charset="UTF-8">
     <title>Mansion RPS Crawler</title>
     <style>
-        body { margin: 0; background: #222; display: flex; justify-content: center; align-items: center; height: 100vh; color: white; font-family: sans-serif; }
-        #gameContainer { position: relative; border: 4px solid #555; }
-        canvas { display: block; background: #333; }
-        #ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; background: rgba(0,0,0,0.8); flex-direction: column; align-items: center; justify-content: center; }
-        .hud { position: absolute; top: 10px; left: 10px; pointer-events: none; }
-        button { padding: 10px 20px; font-size: 16px; cursor: pointer; margin: 5px; }
+        body { margin: 0; background: #1a1a1a; display: flex; justify-content: center; align-items: center; height: 100vh; color: #eee; font-family: 'Courier New', Courier, monospace; }
+        #gameContainer { position: relative; border: 4px solid #444; }
+        canvas { display: block; background: #222; }
+        #ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; background: rgba(0,0,0,0.85); flex-direction: column; align-items: center; justify-content: center; }
+        .hud { position: absolute; top: 10px; left: 10px; pointer-events: none; background: rgba(0,0,0,0.5); padding: 5px; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; margin: 5px; background: #444; color: white; border: 1px solid #777; }
+        button:hover { background: #666; }
     </style>
 </head>
 <body>
@@ -17,7 +18,7 @@
 <div id="gameContainer">
     <canvas id="gameCanvas" width="800" height="600"></canvas>
     <div class="hud" id="hud">
-        Wins Streak: 0 | Losses: 0 | Inventory: Rock: 0, Paper: 0, Scissor: 0
+        Wins: 0 | Losses: 0 | Inv: R:0 P:0 S:0
     </div>
     <div id="ui">
         <h2 id="uiTitle">Challenge!</h2>
@@ -33,25 +34,39 @@
     const uiTitle = document.getElementById('uiTitle');
     const uiControls = document.getElementById('uiControls');
 
-    // Game State
     let player = { x: 400, y: 300, w: 20, h: 40, inv: { rock: 0, paper: 0, scissors: 0 }, streak: 0, losses: 0 };
-    let gameState = 'EXPLORING'; // EXPLORING, RPS
-    let roomContent = null; // { type: 'CHEST' or 'PERSON', item: 'rock'/'paper'/'scissors' }
-    let lastResult = '';
+    let gameState = 'EXPLORING';
+    let entity = null; // Can be a monster or a chest
+    let roomType = 'Living Room';
+    let furniture = [];
 
     function generateRoom() {
-        const rand = Math.random();
-        if (rand > 0.5) {
-            const items = ['rock', 'paper', 'scissors'];
-            roomContent = { type: 'CHEST', item: items[Math.floor(Math.random() * 3)], x: 200 + Math.random()*400, y: 150 + Math.random()*300 };
-        } else {
-            roomContent = { type: 'PERSON', x: 200 + Math.random()*400, y: 150 + Math.random()*300 };
+        const types = ['Living Room', 'Library', 'Kitchen'];
+        roomType = types[Math.floor(Math.random() * types.length)];
+        furniture = [];
+        
+        // Spawn decor based on room type
+        for(let i=0; i<4; i++) {
+            furniture.push({
+                x: Math.random() * 700 + 50,
+                y: Math.random() * 500 + 50,
+                w: 40 + Math.random() * 40,
+                h: 40 + Math.random() * 40
+            });
         }
+
+        // Spawn Entity (10% chest, 90% monster)
+        const isChest = Math.random() < 0.1;
+        entity = {
+            type: isChest ? 'CHEST' : 'MONSTER',
+            x: 100 + Math.random() * 600,
+            y: 100 + Math.random() * 400,
+            active: true
+        };
     }
 
     generateRoom();
 
-    // Input Handling
     const keys = {};
     window.addEventListener('keydown', e => keys[e.key] = true);
     window.addEventListener('keyup', e => keys[e.key] = false);
@@ -59,22 +74,34 @@
     function update() {
         if (gameState !== 'EXPLORING') return;
 
+        // Player Movement
         if (keys['ArrowUp'] && player.y > 0) player.y -= 5;
         if (keys['ArrowDown'] && player.y < 560) player.y += 5;
         if (keys['ArrowLeft'] && player.x > 0) player.x -= 5;
         if (keys['ArrowRight'] && player.x < 780) player.x += 5;
 
-        // Check for Room Transition (Walking into walls)
-        if (player.x <= 0 || player.x >= 780 || player.y <= 0 || player.y >= 560) {
-            player.x = 400; player.y = 300;
-            generateRoom();
+        // Monster Movement (Chase player)
+        if (entity && entity.type === 'MONSTER' && entity.active) {
+            entity.x += (player.x - entity.x) * 0.015;
+            entity.y += (player.y - entity.y) * 0.015;
         }
 
-        // Check for collision
-        if (roomContent && Math.abs(player.x - roomContent.x) < 30 && Math.abs(player.y - roomContent.y) < 30) {
-            if (roomContent.type === 'CHEST') {
-                player.inv[roomContent.item]++;
-                roomContent = null;
+        // Check for Room Transition (Only allowed if no monster active)
+        if (!entity.active || entity.type === 'CHEST') {
+            if (player.x <= 0 || player.x >= 780 || player.y <= 0 || player.y >= 560) {
+                player.x = 400; player.y = 300;
+                generateRoom();
+            }
+        }
+
+        // Collision detection
+        if (entity && entity.active && Math.abs(player.x - entity.x) < 30 && Math.abs(player.y - entity.y) < 30) {
+            if (entity.type === 'CHEST') {
+                const items = ['rock', 'paper', 'scissors'];
+                const found = items[Math.floor(Math.random() * 3)];
+                player.inv[found]++;
+                entity.active = false;
+                alert("Found: " + found);
             } else {
                 startRPS();
             }
@@ -83,13 +110,13 @@
     }
 
     function updateHUD() {
-        hud.innerText = `Win Streak: ${player.streak} | Losses: ${player.losses}/3 | Inv: R:${player.inv.rock} P:${player.inv.paper} S:${player.inv.scissors}`;
+        hud.innerText = `Streak: ${player.streak} | Losses: ${player.losses}/3 | Inv: R:${player.inv.rock} P:${player.inv.paper} S:${player.inv.scissors}`;
     }
 
     function startRPS() {
         gameState = 'RPS';
         ui.style.display = 'flex';
-        uiTitle.innerText = "A Challenger Appears! Pick your move.";
+        uiTitle.innerText = "A Monster blocks your path!";
         uiControls.innerHTML = '';
         ['rock', 'paper', 'scissors'].forEach(move => {
             const btn = document.createElement('button');
@@ -106,40 +133,40 @@
         let win = false;
         if (forceWin) {
             win = true;
-            lastResult = "You used an item to cheat and WIN!";
         } else {
-            if (playerChoice === cpuChoice) { lastResult = "Tie! Play again."; startRPS(); return; }
+            if (playerChoice === cpuChoice) { uiTitle.innerText = "Tie! Try again."; return; }
             if ((playerChoice === 'rock' && cpuChoice === 'scissors') || 
                 (playerChoice === 'scissors' && cpuChoice === 'paper') || 
                 (playerChoice === 'paper' && cpuChoice === 'rock')) {
                 win = true;
-                lastResult = `You played ${playerChoice}, they played ${cpuChoice}. You Win!`;
             } else {
                 win = false;
-                lastResult = `You played ${playerChoice}, they played ${cpuChoice}. You Lose!`;
             }
         }
 
         if (win) {
             player.streak++;
+            entity.active = false;
             if (player.streak >= 10) {
-                alert("YOU ESCAPED THE MANSION! You won 10 in a row.");
+                alert("YOU ESCAPED THE MANSION!");
                 location.reload();
             }
+            uiTitle.innerText = "Victory! The monster vanishes.";
         } else {
             player.streak = 0;
             player.losses++;
+            uiTitle.innerText = "You lost the round!";
             if (player.losses >= 3) {
-                alert("GAME OVER. You lost 3 times.");
+                alert("GAME OVER.");
                 location.reload();
             }
         }
 
-        uiTitle.innerText = lastResult;
         uiControls.innerHTML = '';
         
+        // Show inventory options if lost
         if (!win && (player.inv.rock > 0 || player.inv.paper > 0 || player.inv.scissors > 0)) {
-            uiTitle.innerText += " (Use inventory to flip loss!)";
+            uiTitle.innerText += " (Use inventory to counter!)";
             ['rock', 'paper', 'scissors'].forEach(item => {
                 if(player.inv[item] > 0) {
                     const btn = document.createElement('button');
@@ -151,37 +178,52 @@
         }
         
         const contBtn = document.createElement('button');
-        contBtn.innerText = "Continue Exploring";
-        contBtn.onclick = () => { ui.style.display = 'none'; gameState = 'EXPLORING'; generateRoom(); };
+        contBtn.innerText = "Back to Room";
+        contBtn.onclick = () => { ui.style.display = 'none'; gameState = 'EXPLORING'; };
         uiControls.appendChild(contBtn);
     }
 
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // Draw Room
-        if (roomContent) {
-            ctx.fillStyle = roomContent.type === 'CHEST' ? 'gold' : 'red';
-            ctx.fillRect(roomContent.x, roomContent.y, 30, 30);
-            ctx.fillStyle = 'white';
-            ctx.fillText(roomContent.type, roomContent.x, roomContent.y - 5);
+        // Draw Room Floor/Decor
+        ctx.fillStyle = '#333';
+        furniture.forEach(f => {
+            ctx.fillRect(f.x, f.y, f.w, f.h);
+            ctx.strokeStyle = '#555';
+            ctx.strokeRect(f.x, f.y, f.w, f.h);
+        });
+
+        // Draw Entity
+        if (entity && entity.active) {
+            if (entity.type === 'CHEST') {
+                ctx.fillStyle = 'gold'; // Chest body
+                ctx.fillRect(entity.x, entity.y, 20, 20);
+                ctx.strokeStyle = 'black';
+                ctx.strokeRect(entity.x, entity.y, 20, 20);
+                ctx.moveTo(entity.x, entity.y + 5); ctx.lineTo(entity.x + 20, entity.y + 5); // Lid line
+                ctx.stroke();
+            } else {
+                // Stick Monster
+                ctx.strokeStyle = 'red';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(entity.x + 10, entity.y - 10, 10, 0, Math.PI * 2); // Head
+                ctx.moveTo(entity.x + 10, entity.y); ctx.lineTo(entity.x + 10, entity.y + 20); // Body
+                ctx.moveTo(entity.x + 10, entity.y + 5); ctx.lineTo(entity.x - 10, entity.y + 10); // Spiky Arm
+                ctx.moveTo(entity.x + 10, entity.y + 5); ctx.lineTo(entity.x + 20, entity.y + 10); // Spiky Arm
+                ctx.stroke();
+            }
         }
 
-        // Draw Player (Stick Figure)
+        // Draw Player
         ctx.strokeStyle = 'white';
         ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.arc(player.x + 10, player.y - 10, 10, 0, Math.PI * 2); // Head
-        ctx.moveTo(player.x + 10, player.y);
-        ctx.lineTo(player.x + 10, player.y + 20); // Body
-        ctx.moveTo(player.x + 10, player.y + 5);
-        ctx.lineTo(player.x - 5, player.y + 15); // Arm
-        ctx.moveTo(player.x + 10, player.y + 5);
-        ctx.lineTo(player.x + 25, player.y + 15); // Arm
-        ctx.moveTo(player.x + 10, player.y + 20);
-        ctx.lineTo(player.x - 5, player.y + 40); // Leg
-        ctx.moveTo(player.x + 10, player.y + 20);
-        ctx.lineTo(player.x + 25, player.y + 40); // Leg
+        ctx.arc(player.x + 10, player.y - 10, 10, 0, Math.PI * 2); 
+        ctx.moveTo(player.x + 10, player.y); ctx.lineTo(player.x + 10, player.y + 20);
+        ctx.moveTo(player.x + 10, player.y + 5); ctx.lineTo(player.x - 5, player.y + 15);
+        ctx.moveTo(player.x + 10, player.y + 5); ctx.lineTo(player.x + 25, player.y + 15);
         ctx.stroke();
 
         update();
