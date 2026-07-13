@@ -2,158 +2,107 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Starship Control Terminal</title>
+    <title>One-Button Runner</title>
     <style>
-        /* Cockpit Background */
-        body {
-            margin: 0;
-            padding: 0;
-            height: 100vh;
-            background: radial-gradient(circle at center, #1b2735 0%, #090a0f 100%);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-family: 'Courier New', Courier, monospace;
-            overflow: hidden;
-            color: #ff9900;
-        }
-
-        /* Ambient cockpit decorations */
-        .cockpit-overlay {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none;
-            background-image: 
-                radial-gradient(white, rgba(255,255,255,.2) 2px, transparent 40px),
-                radial-gradient(white, rgba(255,255,255,.15) 1px, transparent 30px);
-            background-size: 550px 550px, 350px 350px;
-            background-position: 0 0, 40px 60px;
-            opacity: 0.3;
-        }
-
-        /* The Console Frame */
-        .console-frame {
-            background: #2c2f33;
-            padding: 30px;
-            border: 8px solid #455a64;
-            border-radius: 15px;
-            box-shadow: 0 0 40px rgba(0,0,0,0.8), inset 0 0 20px rgba(0,0,0,0.5);
-            z-index: 1;
-            position: relative;
-        }
-
-        .status-light {
-            position: absolute;
-            top: 10px;
-            right: 15px;
-            width: 10px;
-            height: 10px;
-            background: #ff0000;
-            border-radius: 50%;
-            box-shadow: 0 0 10px #ff0000;
-            animation: blink 2s infinite;
-        }
-
-        @keyframes blink { 50% { opacity: 0.3; } }
-
-        /* Calculator UI */
-        .calculator { width: 280px; }
-        
-        #display {
-            background: #000;
-            color: #00ff41; /* Classic terminal green */
-            text-align: right;
-            padding: 15px;
-            font-size: 1.8rem;
-            border: 2px inset #555;
-            margin-bottom: 20px;
-            letter-spacing: 2px;
-            text-shadow: 0 0 5px #00ff41;
-        }
-
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 10px;
-        }
-
-        button {
-            padding: 15px;
-            background: #373e44;
-            color: #ddd;
-            border: 1px solid #666;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 1.1rem;
-        }
-
-        button:hover { background: #4a5157; border-color: #ff9900; }
-        button:active { background: #ff9900; color: #000; }
-
-        .btn-op { color: #ff9900; }
-        .btn-eq { background: #b71c1c; color: white; grid-column: span 2; }
+        body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background: #222; color: white; font-family: sans-serif; }
+        canvas { border: 2px solid #555; background: #000; }
     </style>
 </head>
 <body>
-
-    <div class="cockpit-overlay"></div>
-
-    <div class="console-frame">
-        <div class="status-light"></div>
-        <div style="font-size: 0.7rem; margin-bottom: 5px;">SYSTEM STATUS: ONLINE</div>
-        
-        <div id="display">0</div>
-        
-        <div class="grid">
-            <button onclick="clearDisplay()">AC</button>
-            <button class="btn-op" onclick="appendToDisplay('/')">÷</button>
-            <button class="btn-op" onclick="appendToDisplay('*')">×</button>
-            <button onclick="deleteLast()">DEL</button>
-            
-            <button onclick="appendToDisplay('7')">7</button>
-            <button onclick="appendToDisplay('8')">8</button>
-            <button onclick="appendToDisplay('9')">9</button>
-            <button class="btn-op" onclick="appendToDisplay('-')">-</button>
-            
-            <button onclick="appendToDisplay('4')">4</button>
-            <button onclick="appendToDisplay('5')">5</button>
-            <button onclick="appendToDisplay('6')">6</button>
-            <button class="btn-op" onclick="appendToDisplay('+')">+</button>
-            
-            <button onclick="appendToDisplay('1')">1</button>
-            <button onclick="appendToDisplay('2')">2</button>
-            <button onclick="appendToDisplay('3')">3</button>
-            <button onclick="appendToDisplay('0')">0</button>
-            
-            <button onclick="appendToDisplay('.')">.</button>
-            <button class="btn-eq" onclick="calculate()" style="grid-column: span 3;">EXECUTE CALCULATION</button>
-        </div>
-    </div>
+    <canvas id="gameCanvas" width="800" height="200"></canvas>
 
     <script>
-        const display = document.getElementById('display');
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
 
-        function appendToDisplay(input) {
-            if (display.innerText === '0') display.innerText = input;
-            else display.innerText += input;
+        // Game State
+        let player = { x: 50, y: 150, width: 30, height: 30, dy: 0, jumping: false };
+        let obstacles = [];
+        let score = 0;
+        let gameOver = false;
+
+        // Input
+        document.addEventListener("keydown", (e) => {
+            if (e.code === "Space") {
+                if (gameOver) {
+                    resetGame();
+                } else if (!player.jumping) {
+                    player.dy = -12;
+                    player.jumping = true;
+                }
+            }
+        });
+
+        function resetGame() {
+            player.y = 150;
+            player.dy = 0;
+            player.jumping = false;
+            obstacles = [];
+            score = 0;
+            gameOver = false;
+            requestAnimationFrame(update);
         }
 
-        function clearDisplay() { display.innerText = '0'; }
+        function update() {
+            if (gameOver) return;
 
-        function deleteLast() {
-            display.innerText = display.innerText.slice(0, -1);
-            if (display.innerText === '') display.innerText = '0';
+            // Physics
+            player.dy += 0.6; // Gravity
+            player.y += player.dy;
+
+            if (player.y + player.height > 200) {
+                player.y = 200 - player.height;
+                player.jumping = false;
+            }
+
+            // Obstacles
+            if (Math.random() < 0.02) {
+                obstacles.push({ x: 800, width: 30, height: 40 });
+            }
+
+            for (let i = 0; i < obstacles.length; i++) {
+                obstacles[i].x -= 5;
+
+                // Collision
+                if (
+                    player.x < obstacles[i].x + obstacles[i].width &&
+                    player.x + player.width > obstacles[i].x &&
+                    player.y + player.height > 200 - obstacles[i].height
+                ) {
+                    gameOver = true;
+                }
+
+                if (obstacles[i].x + obstacles[i].width < 0) {
+                    obstacles.splice(i, 1);
+                    score++;
+                }
+            }
+
+            draw();
+            requestAnimationFrame(update);
         }
 
-        function calculate() {
-            try {
-                // Replacing visual symbols with JS operators
-                let equation = display.innerText.replace('×', '*').replace('÷', '/');
-                display.innerText = new Function('return ' + equation)();
-            } catch (error) {
-                display.innerText = 'ERROR';
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Player
+            ctx.fillStyle = "#00FF00";
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+
+            // Draw Obstacles
+            ctx.fillStyle = "#FF0000";
+            obstacles.forEach(o => ctx.fillRect(o.x, 200 - o.height, o.width, o.height));
+
+            // Draw Score
+            ctx.fillStyle = "white";
+            ctx.fillText("Score: " + score, 10, 20);
+
+            if (gameOver) {
+                ctx.fillText("GAME OVER - Press Space to Restart", 300, 100);
             }
         }
+
+        update();
     </script>
 </body>
 </html>
