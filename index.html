@@ -39,18 +39,20 @@
     let entity = null;
     let furniture = [];
 
-    function generateRoom() {
-        // Clear old data
+    // Dedicated function to safely create a new room
+    function enterNewRoom() {
+        // Reset player to center
+        player.x = 400;
+        player.y = 300;
+        
+        // Reset furniture
         furniture = [];
-        entity = null; 
-
-        // Generate Furniture
         for(let i=0; i<4; i++) {
             furniture.push({ x: Math.random() * 700 + 50, y: Math.random() * 500 + 50, w: 50, h: 50 });
         }
         
-        // Spawn New Entity
-        const isChest = Math.random() < 0.1;
+        // Reset entity
+        const isChest = Math.random() < 0.2; // 20% Chance
         entity = { 
             type: isChest ? 'CHEST' : 'MONSTER', 
             x: 100 + Math.random() * 600, 
@@ -59,7 +61,8 @@
         };
     }
 
-    generateRoom();
+    // Initialize first room
+    enterNewRoom();
 
     const keys = {};
     window.addEventListener('keydown', e => keys[e.key] = true);
@@ -76,11 +79,9 @@
 
         // Monster Logic
         if (entity && entity.type === 'MONSTER' && entity.active) {
-            // Monster Chase Speed
             entity.x += (player.x - entity.x) * 0.01;
             entity.y += (player.y - entity.y) * 0.01;
 
-            // Collision check
             if (Math.abs(player.x - entity.x) < 30 && Math.abs(player.y - entity.y) < 30) {
                 startRPS();
             }
@@ -89,17 +90,13 @@
                 const items = ['rock', 'paper', 'scissors'];
                 player.inv[items[Math.floor(Math.random() * 3)]]++;
                 entity.active = false;
-                alert("Found an item!");
             }
         }
 
-        // Room Transition (Only if no active monster)
-        if (!entity || !entity.active || entity.type === 'CHEST') {
+        // Room Transition (Trigger when reaching edge IF room is cleared)
+        if (!entity.active) {
             if (player.x <= 0 || player.x >= 780 || player.y <= 0 || player.y >= 560) {
-                // Reset player position slightly inward
-                player.x = (player.x <= 0) ? 750 : (player.x >= 780) ? 50 : player.x;
-                player.y = (player.y <= 0) ? 550 : (player.y >= 560) ? 50 : player.y;
-                generateRoom();
+                enterNewRoom();
             }
         }
         updateHUD();
