@@ -2,232 +2,106 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Asteroid Defense Cockpit</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heroclix Team Builder</title>
     <style>
-        :root {
-            --cockpit-color: #2c3e50;
-            --panel-color: #34495e;
-            --accent-color: #e74c3c;
-            --text-color: #ecf0f1;
-        }
+        :root { --primary: #2c3e50; --accent: #e74c3c; }
+        body { font-family: sans-serif; background: #f4f4f9; padding: 20px; }
+        .container { max-width: 800px; margin: auto; }
+        
+        /* Card Flip Styles */
+        .card-stage { width: 300px; height: 400px; perspective: 1000px; margin: 20px auto; cursor: pointer; }
+        .card-inner { position: relative; width: 100%; height: 100%; text-align: center; transition: transform 0.6s; transform-style: preserve-3d; }
+        .card-stage.flipped .card-inner { transform: rotateY(180deg); }
+        .front, .back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+        .back { transform: rotateY(180deg); }
+        img { width: 100%; height: 100%; object-fit: cover; }
 
-        body {
-            margin: 0;
-            background: #000;
-            color: var(--text-color);
-            font-family: 'Courier New', Courier, monospace;
-            overflow: hidden;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-
-        #cockpit-frame {
-            width: 100vw;
-            height: 100vh;
-            border: 20px solid var(--cockpit-color);
-            box-sizing: border-box;
-            position: relative;
-            background: radial-gradient(circle, #1a1a1a 0%, #000 100%);
-        }
-
-        #game-canvas {
-            width: 100%;
-            height: 70%;
-            display: block;
-            background: rgba(0, 20, 40, 0.3);
-            border-bottom: 5px solid var(--panel-color);
-        }
-
-        #ui-layer {
-            padding: 10px;
-            background: var(--panel-color);
-            height: 30%;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-        }
-
-        .stat-box { font-size: 1.2rem; font-weight: bold; }
-        .btn {
-            background: var(--accent-color);
-            color: white;
-            border: none;
-            padding: 10px;
-            margin: 5px;
-            cursor: pointer;
-            border-radius: 4px;
-            width: 100%;
-        }
-        .btn:disabled { background: #7f8c8d; }
-
-        #game-over-screen {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9);
-            display: none;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 10;
-        }
+        /* UI Elements */
+        .library, .team-builder { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; border: none; border-radius: 4px; background: var(--primary); color: white; }
+        .stats { font-weight: bold; color: var(--accent); }
+        .hidden { display: none; }
     </style>
 </head>
 <body>
 
-<div id="cockpit-frame">
-    <canvas id="game-canvas"></canvas>
-    
-    <div id="ui-layer">
-        <div>
-            <div class="stat-box">Score: <span id="score">0</span></div>
-            <div class="stat-box">Hull: <span id="hull">100</span>%</div>
-            <div class="stat-box">Turrets: <span id="turret-count">1</span>/5</div>
-        </div>
-        <div>
-            <button class="btn" id="upg-fire" onclick="buyFireRate()">Upgrade Fire Rate (+5%): 10pts</button>
-            <button class="btn" id="upg-val" onclick="buyValue()">Upgrade Value (+2%): 10pts</button>
-            <button class="btn" id="upg-turret" onclick="buyTurret()">Add Turret: 50pts</button>
+<div class="container">
+    <h1>Heroclix Manager</h1>
+
+    <div class="library">
+        <h2>Available Cards</h2>
+        <div id="library-list"></div>
+    </div>
+
+    <div class="team-builder">
+        <h2>My Team (Points: <span id="total-points">0</span>)</h2>
+        <div id="active-card-container">
+            </div>
+        <div id="nav-controls">
+            <button onclick="changeCard(-1)">Previous</button>
+            <button onclick="changeCard(1)">Next</button>
         </div>
     </div>
 </div>
 
-<div id="game-over-screen">
-    <h1>MISSION FAILED</h1>
-    <p>Final Score: <span id="final-score">0</span></p>
-    <input type="text" id="initials" placeholder="Enter Initials" maxlength="3">
-    <button class="btn" onclick="saveScore()">Save Score</button>
-    <div id="leaderboard"></div>
-</div>
-
 <script>
-    const canvas = document.getElementById('game-canvas');
-    const ctx = canvas.getContext('2d');
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight * 0.7;
+    // 1. DATA: Add your cards here
+    let cards = [
+        { id: 1, name: "Spider-Man", points: 75, front: "https://via.placeholder.com/300x400/3498db/ffffff?text=Spider-Man+Front", back: "https://via.placeholder.com/300x400/2980b9/ffffff?text=Spider-Man+Back" },
+        { id: 2, name: "Iron Man", points: 120, front: "https://via.placeholder.com/300x400/e74c3c/ffffff?text=Iron-Man+Front", back: "https://via.placeholder.com/300x400/c0392b/ffffff?text=Iron-Man+Back" },
+        { id: 3, name: "Batman", points: 90, front: "https://via.placeholder.com/300x400/2c3e50/ffffff?text=Batman+Front", back: "https://via.placeholder.com/300x400/34495e/ffffff?text=Batman+Back" }
+    ];
 
-    // Game State
-    let state = {
-        score: 0,
-        hull: 100,
-        turrets: 1,
-        fireRateLevel: 0,
-        valueLevel: 0,
-        pointsPerAsteroid: 1,
-        asteroids: [],
-        gameOver: false
-    };
+    let myTeam = [];
+    let currentViewIndex = 0;
 
-    let upgradeCosts = { fire: 10, val: 10, turret: 50 };
+    // 2. INITIALIZATION: Sort Alpha and Render
+    cards.sort((a, b) => a.name.localeCompare(b.name));
 
-    // Game Loop
-    function update() {
-        if (state.gameOver) return;
+    function renderLibrary() {
+        const list = document.getElementById('library-list');
+        list.innerHTML = cards.map(c => `<button onclick="addToTeam(${c.id})">Add ${c.name} (${c.points} pts)</button>`).join('');
+    }
 
-        // Spawn logic: gets faster over time
-        if (Math.random() < 0.02 + (state.score / 5000)) {
-            state.asteroids.push({
-                x: Math.random() * canvas.width,
-                y: 0,
-                speed: 1 + (state.score / 1000)
-            });
+    // 3. LOGIC: Manage Team
+    function addToTeam(id) {
+        const card = cards.find(c => c.id === id);
+        myTeam.push(card);
+        updateTeamView();
+    }
+
+    function updateTeamView() {
+        const total = myTeam.reduce((sum, c) => sum + c.points, 0);
+        document.getElementById('total-points').innerText = total;
+        renderActiveCard();
+    }
+
+    function renderActiveCard() {
+        const container = document.getElementById('active-card-container');
+        if (myTeam.length === 0) {
+            container.innerHTML = "<p>Select cards to start your team.</p>";
+            return;
         }
-
-        // Update positions & Collision
-        state.asteroids.forEach((ast, index) => {
-            ast.y += ast.speed;
-            if (ast.y > canvas.height) {
-                state.hull -= 10;
-                state.asteroids.splice(index, 1);
-            }
-        });
-
-        // Turret Logic (Automated)
-        if (Math.random() < (0.05 + (state.fireRateLevel * 0.01)) * state.turrets) {
-            if (state.asteroids.length > 0) {
-                state.asteroids.shift(); // Destroy first asteroid
-                state.score += Math.round(state.pointsPerAsteroid);
-            }
-        }
-
-        if (state.hull <= 0) endGame();
-        render();
-        requestAnimationFrame(update);
+        const card = myTeam[currentViewIndex];
+        container.innerHTML = `
+            <div class="card-stage" onclick="this.classList.toggle('flipped')">
+                <div class="card-inner">
+                    <div class="front"><img src="${card.front}"></div>
+                    <div class="back"><img src="${card.back}"></div>
+                </div>
+            </div>
+            <p><strong>${card.name}</strong></p>
+        `;
     }
 
-    function render() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        // Draw Asteroids
-        ctx.fillStyle = '#bdc3c7';
-        state.asteroids.forEach(ast => {
-            ctx.beginPath();
-            ctx.arc(ast.x, ast.y, 10, 0, Math.PI * 2);
-            ctx.fill();
-        });
-
-        document.getElementById('score').innerText = state.score;
-        document.getElementById('hull').innerText = state.hull;
-        document.getElementById('turret-count').innerText = state.turrets;
+    function changeCard(dir) {
+        if (myTeam.length === 0) return;
+        currentViewIndex = (currentViewIndex + dir + myTeam.length) % myTeam.length;
+        renderActiveCard();
     }
 
-    // Upgrades
-    function buyFireRate() {
-        if (state.score >= upgradeCosts.fire) {
-            state.score -= upgradeCosts.fire;
-            state.fireRateLevel++;
-            upgradeCosts.fire = Math.round(upgradeCosts.fire * 1.5);
-            document.getElementById('upg-fire').innerText = `Upgrade Fire Rate: ${upgradeCosts.fire}pts`;
-        }
-    }
-
-    function buyValue() {
-        if (state.score >= upgradeCosts.val) {
-            state.score -= upgradeCosts.val;
-            state.valueLevel++;
-            state.pointsPerAsteroid += 0.02;
-            upgradeCosts.val = Math.round(upgradeCosts.val * 1.5);
-            document.getElementById('upg-val').innerText = `Upgrade Value: ${upgradeCosts.val}pts`;
-        }
-    }
-
-    function buyTurret() {
-        if (state.score >= upgradeCosts.turret && state.turrets < 5) {
-            state.score -= upgradeCosts.turret;
-            state.turrets++;
-            upgradeCosts.turret = Math.round(upgradeCosts.turret * 2);
-            document.getElementById('upg-turret').innerText = `Add Turret: ${upgradeCosts.turret}pts`;
-            if (state.turrets === 5) document.getElementById('upg-turret').disabled = true;
-        }
-    }
-
-    function endGame() {
-        state.gameOver = true;
-        document.getElementById('game-over-screen').style.display = 'flex';
-        document.getElementById('final-score').innerText = state.score;
-        showLeaderboard();
-    }
-
-    function saveScore() {
-        const initials = document.getElementById('initials').value.toUpperCase().substring(0,3);
-        let highScores = JSON.parse(localStorage.getItem('scores') || '[]');
-        highScores.push({ initials, score: state.score });
-        highScores.sort((a,b) => b.score - a.score);
-        highScores = highScores.slice(0, 3);
-        localStorage.setItem('scores', JSON.stringify(highScores));
-        showLeaderboard();
-    }
-
-    function showLeaderboard() {
-        const scores = JSON.parse(localStorage.getItem('scores') || '[]');
-        let html = '<h3>High Scores</h3>';
-        scores.forEach((s, i) => html += `<p>${i+1}. ${s.initials} - ${s.score}</p>`);
-        document.getElementById('leaderboard').innerHTML = html;
-    }
-
-    update();
+    renderLibrary();
 </script>
 </body>
 </html>
