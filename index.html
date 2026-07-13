@@ -2,219 +2,232 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Mansion RPS Crawler</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Asteroid Defense Cockpit</title>
     <style>
-        body { margin: 0; background: #1a1a1a; display: flex; justify-content: center; align-items: center; height: 100vh; color: #eee; font-family: 'Courier New', Courier, monospace; }
-        #gameContainer { position: relative; border: 4px solid #444; }
-        canvas { display: block; background: #222; }
-        #ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; background: rgba(0,0,0,0.85); flex-direction: column; align-items: center; justify-content: center; z-index: 10; }
-        .hud { position: absolute; top: 10px; left: 10px; pointer-events: none; background: rgba(0,0,0,0.5); padding: 5px; }
-        button { padding: 10px 20px; font-size: 16px; cursor: pointer; margin: 5px; background: #444; color: white; border: 1px solid #777; }
-        button:hover { background: #666; }
+        :root {
+            --cockpit-color: #2c3e50;
+            --panel-color: #34495e;
+            --accent-color: #e74c3c;
+            --text-color: #ecf0f1;
+        }
+
+        body {
+            margin: 0;
+            background: #000;
+            color: var(--text-color);
+            font-family: 'Courier New', Courier, monospace;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #cockpit-frame {
+            width: 100vw;
+            height: 100vh;
+            border: 20px solid var(--cockpit-color);
+            box-sizing: border-box;
+            position: relative;
+            background: radial-gradient(circle, #1a1a1a 0%, #000 100%);
+        }
+
+        #game-canvas {
+            width: 100%;
+            height: 70%;
+            display: block;
+            background: rgba(0, 20, 40, 0.3);
+            border-bottom: 5px solid var(--panel-color);
+        }
+
+        #ui-layer {
+            padding: 10px;
+            background: var(--panel-color);
+            height: 30%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .stat-box { font-size: 1.2rem; font-weight: bold; }
+        .btn {
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 10px;
+            margin: 5px;
+            cursor: pointer;
+            border-radius: 4px;
+            width: 100%;
+        }
+        .btn:disabled { background: #7f8c8d; }
+
+        #game-over-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
     </style>
 </head>
 <body>
 
-<div id="gameContainer">
-    <canvas id="gameCanvas" width="800" height="600"></canvas>
-    <div class="hud" id="hud">
-        Streak: 0 | Losses: 0 | Inv: R:0 P:0 S:0
-    </div>
-    <div id="ui">
-        <h2 id="uiTitle">Challenge!</h2>
-        <div id="uiControls"></div>
+<div id="cockpit-frame">
+    <canvas id="game-canvas"></canvas>
+    
+    <div id="ui-layer">
+        <div>
+            <div class="stat-box">Score: <span id="score">0</span></div>
+            <div class="stat-box">Hull: <span id="hull">100</span>%</div>
+            <div class="stat-box">Turrets: <span id="turret-count">1</span>/5</div>
+        </div>
+        <div>
+            <button class="btn" id="upg-fire" onclick="buyFireRate()">Upgrade Fire Rate (+5%): 10pts</button>
+            <button class="btn" id="upg-val" onclick="buyValue()">Upgrade Value (+2%): 10pts</button>
+            <button class="btn" id="upg-turret" onclick="buyTurret()">Add Turret: 50pts</button>
+        </div>
     </div>
 </div>
 
+<div id="game-over-screen">
+    <h1>MISSION FAILED</h1>
+    <p>Final Score: <span id="final-score">0</span></p>
+    <input type="text" id="initials" placeholder="Enter Initials" maxlength="3">
+    <button class="btn" onclick="saveScore()">Save Score</button>
+    <div id="leaderboard"></div>
+</div>
+
 <script>
-    const canvas = document.getElementById('gameCanvas');
+    const canvas = document.getElementById('game-canvas');
     const ctx = canvas.getContext('2d');
-    const ui = document.getElementById('ui');
-    const hud = document.getElementById('hud');
-    const uiTitle = document.getElementById('uiTitle');
-    const uiControls = document.getElementById('uiControls');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight * 0.7;
 
-    let player = { x: 400, y: 300, inv: { rock: 0, paper: 0, scissors: 0 }, streak: 0, losses: 0 };
-    let gameState = 'EXPLORING';
-    let entity = null;
-    let furniture = [];
+    // Game State
+    let state = {
+        score: 0,
+        hull: 100,
+        turrets: 1,
+        fireRateLevel: 0,
+        valueLevel: 0,
+        pointsPerAsteroid: 1,
+        asteroids: [],
+        gameOver: false
+    };
 
-    // Dedicated function to safely create a new room
-    function enterNewRoom() {
-        // Reset player to center
-        player.x = 400;
-        player.y = 300;
-        
-        // Reset furniture
-        furniture = [];
-        for(let i=0; i<4; i++) {
-            furniture.push({ x: Math.random() * 700 + 50, y: Math.random() * 500 + 50, w: 50, h: 50 });
-        }
-        
-        // Reset entity
-        const isChest = Math.random() < 0.2; // 20% Chance
-        entity = { 
-            type: isChest ? 'CHEST' : 'MONSTER', 
-            x: 100 + Math.random() * 600, 
-            y: 100 + Math.random() * 400, 
-            active: true 
-        };
-    }
+    let upgradeCosts = { fire: 10, val: 10, turret: 50 };
 
-    // Initialize first room
-    enterNewRoom();
-
-    const keys = {};
-    window.addEventListener('keydown', e => keys[e.key] = true);
-    window.addEventListener('keyup', e => keys[e.key] = false);
-
+    // Game Loop
     function update() {
-        if (gameState !== 'EXPLORING') return;
+        if (state.gameOver) return;
 
-        // Player Movement
-        if (keys['ArrowUp'] && player.y > 0) player.y -= 5;
-        if (keys['ArrowDown'] && player.y < 560) player.y += 5;
-        if (keys['ArrowLeft'] && player.x > 0) player.x -= 5;
-        if (keys['ArrowRight'] && player.x < 780) player.x += 5;
-
-        // Monster Logic
-        if (entity && entity.type === 'MONSTER' && entity.active) {
-            entity.x += (player.x - entity.x) * 0.01;
-            entity.y += (player.y - entity.y) * 0.01;
-
-            if (Math.abs(player.x - entity.x) < 30 && Math.abs(player.y - entity.y) < 30) {
-                startRPS();
-            }
-        } else if (entity && entity.type === 'CHEST' && entity.active) {
-             if (Math.abs(player.x - entity.x) < 30 && Math.abs(player.y - entity.y) < 30) {
-                const items = ['rock', 'paper', 'scissors'];
-                player.inv[items[Math.floor(Math.random() * 3)]]++;
-                entity.active = false;
-            }
-        }
-
-        // Room Transition (Trigger when reaching edge IF room is cleared)
-        if (!entity.active) {
-            if (player.x <= 0 || player.x >= 780 || player.y <= 0 || player.y >= 560) {
-                enterNewRoom();
-            }
-        }
-        updateHUD();
-    }
-
-    function updateHUD() {
-        hud.innerText = `Streak: ${player.streak} | Losses: ${player.losses}/3 | Inv: R:${player.inv.rock} P:${player.inv.paper} S:${player.inv.scissors}`;
-    }
-
-    function startRPS() {
-        gameState = 'RPS';
-        ui.style.display = 'flex';
-        uiTitle.innerText = "A Monster blocks your path!";
-        uiControls.innerHTML = '';
-        ['rock', 'paper', 'scissors'].forEach(move => {
-            const btn = document.createElement('button');
-            btn.innerText = move.toUpperCase();
-            btn.onclick = () => playRPS(move);
-            uiControls.appendChild(btn);
-        });
-    }
-
-    function playRPS(playerChoice) {
-        const moves = ['rock', 'paper', 'scissors'];
-        const cpuChoice = moves[Math.floor(Math.random() * 3)];
-        
-        if (playerChoice === cpuChoice) {
-            uiTitle.innerText = "Tie! Try again.";
-            return;
-        }
-
-        const isWin = (playerChoice === 'rock' && cpuChoice === 'scissors') || 
-                      (playerChoice === 'scissors' && cpuChoice === 'paper') || 
-                      (playerChoice === 'paper' && cpuChoice === 'rock');
-
-        if (isWin) {
-            resolveRound('WIN');
-        } else {
-            showLossOptions();
-        }
-    }
-
-    function showLossOptions() {
-        uiTitle.innerText = "You lost the round!";
-        uiControls.innerHTML = '';
-        
-        const hasItems = player.inv.rock > 0 || player.inv.paper > 0 || player.inv.scissors > 0;
-        if (hasItems) {
-            uiTitle.innerText += " (Use inventory to counter!)";
-            ['rock', 'paper', 'scissors'].forEach(item => {
-                if(player.inv[item] > 0) {
-                    const btn = document.createElement('button');
-                    btn.innerText = "Use " + item.toUpperCase();
-                    btn.onclick = () => { player.inv[item]--; resolveRound('CHEATED_WIN'); };
-                    uiControls.appendChild(btn);
-                }
+        // Spawn logic: gets faster over time
+        if (Math.random() < 0.02 + (state.score / 5000)) {
+            state.asteroids.push({
+                x: Math.random() * canvas.width,
+                y: 0,
+                speed: 1 + (state.score / 1000)
             });
         }
 
-        const btn = document.createElement('button');
-        btn.innerText = "Accept Defeat";
-        btn.onclick = () => resolveRound('LOSS');
-        uiControls.appendChild(btn);
-    }
-
-    function resolveRound(result) {
-        if (result === 'WIN') {
-            player.streak++;
-            entity.active = false;
-        } else if (result === 'LOSS') {
-            player.streak = 0;
-            player.losses++;
-            entity.active = false;
-        } else if (result === 'CHEATED_WIN') {
-            entity.active = false;
-        }
-
-        if (player.streak >= 10) { alert("YOU ESCAPED THE MANSION!"); location.reload(); }
-        if (player.losses >= 3) { alert("GAME OVER."); location.reload(); }
-        
-        ui.style.display = 'none';
-        gameState = 'EXPLORING';
-    }
-
-    function drawStickFigure(x, y, color) {
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(x + 10, y - 10, 10, 0, Math.PI * 2); 
-        ctx.moveTo(x + 10, y); ctx.lineTo(x + 10, y + 20);
-        ctx.moveTo(x + 10, y + 5); ctx.lineTo(x - 5, y + 15);
-        ctx.moveTo(x + 10, y + 5); ctx.lineTo(x + 25, y + 15);
-        ctx.moveTo(x + 10, y + 20); ctx.lineTo(x + 5, y + 40);
-        ctx.moveTo(x + 10, y + 20); ctx.lineTo(x + 15, y + 40);
-        ctx.stroke();
-    }
-
-    function draw() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        furniture.forEach(f => {
-            ctx.fillStyle = '#333'; ctx.fillRect(f.x, f.y, f.w, f.h);
-            ctx.strokeStyle = '#555'; ctx.strokeRect(f.x, f.y, f.w, f.h);
+        // Update positions & Collision
+        state.asteroids.forEach((ast, index) => {
+            ast.y += ast.speed;
+            if (ast.y > canvas.height) {
+                state.hull -= 10;
+                state.asteroids.splice(index, 1);
+            }
         });
 
-        if (entity && entity.active) {
-            if (entity.type === 'CHEST') {
-                ctx.fillStyle = 'gold'; ctx.fillRect(entity.x, entity.y, 20, 20);
-            } else {
-                drawStickFigure(entity.x, entity.y, 'red');
+        // Turret Logic (Automated)
+        if (Math.random() < (0.05 + (state.fireRateLevel * 0.01)) * state.turrets) {
+            if (state.asteroids.length > 0) {
+                state.asteroids.shift(); // Destroy first asteroid
+                state.score += Math.round(state.pointsPerAsteroid);
             }
         }
 
-        drawStickFigure(player.x, player.y, 'white');
-        update();
-        requestAnimationFrame(draw);
+        if (state.hull <= 0) endGame();
+        render();
+        requestAnimationFrame(update);
     }
 
-    draw();
+    function render() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw Asteroids
+        ctx.fillStyle = '#bdc3c7';
+        state.asteroids.forEach(ast => {
+            ctx.beginPath();
+            ctx.arc(ast.x, ast.y, 10, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        document.getElementById('score').innerText = state.score;
+        document.getElementById('hull').innerText = state.hull;
+        document.getElementById('turret-count').innerText = state.turrets;
+    }
+
+    // Upgrades
+    function buyFireRate() {
+        if (state.score >= upgradeCosts.fire) {
+            state.score -= upgradeCosts.fire;
+            state.fireRateLevel++;
+            upgradeCosts.fire = Math.round(upgradeCosts.fire * 1.5);
+            document.getElementById('upg-fire').innerText = `Upgrade Fire Rate: ${upgradeCosts.fire}pts`;
+        }
+    }
+
+    function buyValue() {
+        if (state.score >= upgradeCosts.val) {
+            state.score -= upgradeCosts.val;
+            state.valueLevel++;
+            state.pointsPerAsteroid += 0.02;
+            upgradeCosts.val = Math.round(upgradeCosts.val * 1.5);
+            document.getElementById('upg-val').innerText = `Upgrade Value: ${upgradeCosts.val}pts`;
+        }
+    }
+
+    function buyTurret() {
+        if (state.score >= upgradeCosts.turret && state.turrets < 5) {
+            state.score -= upgradeCosts.turret;
+            state.turrets++;
+            upgradeCosts.turret = Math.round(upgradeCosts.turret * 2);
+            document.getElementById('upg-turret').innerText = `Add Turret: ${upgradeCosts.turret}pts`;
+            if (state.turrets === 5) document.getElementById('upg-turret').disabled = true;
+        }
+    }
+
+    function endGame() {
+        state.gameOver = true;
+        document.getElementById('game-over-screen').style.display = 'flex';
+        document.getElementById('final-score').innerText = state.score;
+        showLeaderboard();
+    }
+
+    function saveScore() {
+        const initials = document.getElementById('initials').value.toUpperCase().substring(0,3);
+        let highScores = JSON.parse(localStorage.getItem('scores') || '[]');
+        highScores.push({ initials, score: state.score });
+        highScores.sort((a,b) => b.score - a.score);
+        highScores = highScores.slice(0, 3);
+        localStorage.setItem('scores', JSON.stringify(highScores));
+        showLeaderboard();
+    }
+
+    function showLeaderboard() {
+        const scores = JSON.parse(localStorage.getItem('scores') || '[]');
+        let html = '<h3>High Scores</h3>';
+        scores.forEach((s, i) => html += `<p>${i+1}. ${s.initials} - ${s.score}</p>`);
+        document.getElementById('leaderboard').innerHTML = html;
+    }
+
+    update();
 </script>
 </body>
 </html>
