@@ -3,17 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat with Jenna</title>
+    <title>Jenna: Your Coding Companion</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #fdf5e6; display: flex; justify-content: center; padding: 20px; }
-        #chat-container { width: 400px; height: 600px; background: white; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: flex; flex-direction: column; overflow: hidden; border: 2px solid #d2691e; }
-        #chat-box { flex: 1; padding: 20px; overflow-y: auto; background-color: #fffaf0; }
-        .message { margin-bottom: 15px; padding: 10px; border-radius: 15px; max-width: 80%; }
-        .user { background-color: #e0e0e0; align-self: flex-end; margin-left: auto; }
-        .jenna { background-color: #ffe4b5; align-self: flex-start; border: 1px solid #d2691e; }
-        #input-area { display: flex; padding: 10px; border-top: 1px solid #ddd; }
-        input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
-        button { padding: 10px 20px; margin-left: 5px; background-color: #d2691e; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        :root { --primary: #d2691e; --bg: #fdf5e6; }
+        body { font-family: 'Segoe UI', sans-serif; background: #eee; display: flex; justify-content: center; height: 100vh; margin: 0; }
+        #chat-container { width: 100%; max-width: 600px; height: 100vh; background: white; display: flex; flex-direction: column; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
+        #chat-box { flex: 1; padding: 20px; overflow-y: auto; background: #fffaf0; }
+        .message { margin: 10px 0; padding: 12px; border-radius: 12px; max-width: 85%; line-height: 1.4; }
+        .user { background: #e0e0e0; align-self: flex-end; margin-left: auto; }
+        .jenna { background: #ffe4b5; border: 1px solid var(--primary); }
+        #input-area { padding: 15px; border-top: 2px solid #ddd; display: flex; gap: 10px; }
+        input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+        button { padding: 10px 20px; background: var(--primary); color: white; border: none; border-radius: 5px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -21,58 +22,67 @@
 <div id="chat-container">
     <div id="chat-box"></div>
     <div id="input-area">
-        <input type="text" id="user-input" placeholder="Say something to Jenna...">
-        <button onclick="sendMessage()">Send</button>
+        <input type="text" id="user-input" placeholder="Ask about HTML or chat with me...">
+        <button onclick="processInput()">Send</button>
     </div>
 </div>
 
 <script>
-    // Memory: This array persists while the page is open
-    const conversationHistory = [];
+    // 1. The Knowledge Base (Expand this to make her "fluent" in everything)
+    const knowledgeBase = {
+        "html": "HTML (HyperText Markup Language) is the skeleton of the web. It uses tags like <div>, <p>, and <h1> to structure content. Want to see a basic template?",
+        "css": "CSS is what makes the web beautiful! It handles styling, colors, and layouts. Think of it as the 'clothes' for the HTML 'skeleton'.",
+        "javascript": "JavaScript is the brain! It makes pages interactive—like when you click a button and something happens.",
+        "variable": "A variable is like a box with a label where you store data, like 'let age = 20;'.",
+        "function": "A function is a reusable block of code designed to perform a particular task. You define it once, and call it whenever you need it!",
+        "div": "The <div> tag is a container used to group elements together so you can style them or manipulate them with JS."
+    };
 
-    function appendMessage(sender, text) {
-        const chatBox = document.getElementById('chat-box');
-        const div = document.createElement('div');
-        div.className = `message ${sender.toLowerCase()}`;
-        div.innerText = `${sender}: ${text}`;
-        chatBox.appendChild(div);
-        chatBox.scrollTop = chatBox.scrollHeight;
-    }
+    const history = [];
 
-    function getJennaResponse(input) {
-        input = input.toLowerCase();
-        
-        // Simple "Intelligent" Logic
-        if (input.includes('hello') || input.includes('hi')) return "Hi there! *twitches ear happily* I'm Jenna, just hanging out in the digital ether. How's your day?";
-        if (input.includes('age') || input.includes('old')) return "I'm exactly 20! Feels like a good age to be, don't you think?";
-        if (input.includes('fox')) return "Yup, 100% humanoid fox! My tail is currently swishing behind my data streams. What's up?";
-        if (input.includes('help')) return "I'm here to chat! You can ask me about myself or just tell me how you're feeling.";
-        
-        return "That's interesting! *tilts head* Tell me more about that.";
-    }
-
-    function sendMessage() {
+    function processInput() {
         const inputField = document.getElementById('user-input');
-        const userText = inputField.value;
-        if (!userText) return;
+        const text = inputField.value.trim();
+        if (!text) return;
 
-        // Save to memory
-        conversationHistory.push({ role: 'user', text: userText });
-        appendMessage('You', userText);
-
-        // Jenna responds
-        const response = getJennaResponse(userText);
-        conversationHistory.push({ role: 'Jenna', text: response });
-        appendMessage('Jenna', response);
+        history.push({ role: 'user', text: text });
+        appendMessage('You', text);
+        
+        // Jenna's "Thinking"
+        setTimeout(() => {
+            const response = generateResponse(text);
+            history.push({ role: 'Jenna', text: response });
+            appendMessage('Jenna', response);
+        }, 500);
 
         inputField.value = '';
     }
 
-    // Allow Enter key to send
-    document.getElementById('user-input').addEventListener('keypress', function (e) {
-        if (e.key === 'Enter') sendMessage();
-    });
-</script>
+    function generateResponse(input) {
+        const lower = input.toLowerCase();
+        
+        // Check Knowledge Base first
+        for (let key in knowledgeBase) {
+            if (lower.includes(key)) {
+                return `*Adjusts glasses* Great question! ${knowledgeBase[key]}`;
+            }
+        }
 
+        // Persona Responses
+        if (lower.includes("hi") || lower.includes("hello")) return "Hello! *tail wags* I'm Jenna, your friendly fox coder. What are we building today?";
+        if (lower.includes("how are you")) return "I'm doing great! Just processing data and keeping my ears sharp for your next question.";
+        
+        return "I'm not quite sure about that one, but I'm learning! Ask me about HTML, CSS, or JavaScript, and I'll do my best to explain.";
+    }
+
+    function appendMessage(sender, text) {
+        const box = document.getElementById('chat-box');
+        const div = document.createElement('div');
+        div.className = `message ${sender.toLowerCase()}`;
+        div.innerText = `${sender}: ${text}`;
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
+    }
+</script>
 </body>
 </html>
