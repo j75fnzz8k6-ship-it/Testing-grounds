@@ -2,107 +2,133 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>One-Button Runner</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D&D Character Generator</title>
     <style>
-        body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background: #222; color: white; font-family: sans-serif; }
-        canvas { border: 2px solid #555; background: #000; }
+        body { font-family: 'Segoe UI', sans-serif; background: #2c3e50; color: #ecf0f1; display: flex; justify-content: center; padding: 20px; }
+        .container { background: #34495e; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); width: 100%; max-width: 500px; text-align: center; }
+        .page { display: none; }
+        .page.active { display: block; }
+        h1 { color: #f1c40f; }
+        button { background: #e67e22; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 4px; margin-top: 20px; font-size: 16px; }
+        button:hover { background: #d35400; }
+        .stat-row { display: flex; justify-content: space-between; margin: 10px 0; align-items: center; }
+        .stat-input { width: 50px; background: #2c3e50; border: 1px solid #7f8c8d; color: white; text-align: center; padding: 5px; border-radius: 4px; }
+        .result-box { text-align: left; background: #2c3e50; padding: 15px; border-radius: 5px; }
     </style>
 </head>
 <body>
-    <canvas id="gameCanvas" width="800" height="200"></canvas>
 
-    <script>
-        const canvas = document.getElementById("gameCanvas");
-        const ctx = canvas.getContext("2d");
+<div class="container">
+    <div id="page-start" class="page active">
+        <h1>D&D Character Gen</h1>
+        <p>Let's build your next adventure.</p>
+        <button onclick="nextPage('page-race')">Start Generating</button>
+    </div>
 
-        // Game State
-        let player = { x: 50, y: 150, width: 30, height: 30, dy: 0, jumping: false };
-        let obstacles = [];
-        let score = 0;
-        let gameOver = false;
+    <div id="page-race" class="page">
+        <h2>Select Race</h2>
+        <h3 id="display-race">Human</h3>
+        <button onclick="randomize('race')">Randomize</button>
+        <button onclick="nextPage('page-gender')">Next</button>
+    </div>
 
-        // Input
-        document.addEventListener("keydown", (e) => {
-            if (e.code === "Space") {
-                if (gameOver) {
-                    resetGame();
-                } else if (!player.jumping) {
-                    player.dy = -12;
-                    player.jumping = true;
-                }
-            }
-        });
+    <div id="page-gender" class="page">
+        <h2>Select Gender</h2>
+        <h3 id="display-gender">Non-Binary</h3>
+        <button onclick="randomize('gender')">Randomize</button>
+        <button onclick="nextPage('page-stats')">Next</button>
+    </div>
 
-        function resetGame() {
-            player.y = 150;
-            player.dy = 0;
-            player.jumping = false;
-            obstacles = [];
-            score = 0;
-            gameOver = false;
-            requestAnimationFrame(update);
+    <div id="page-stats" class="page">
+        <h2>Assign Stats</h2>
+        <div id="stat-container"></div>
+        <button onclick="randomize('stats')">Re-Roll Stats</button>
+        <button onclick="nextPage('page-class')">Next</button>
+    </div>
+
+    <div id="page-class" class="page">
+        <h2>Select Class</h2>
+        <h3 id="display-class">Fighter</h3>
+        <button onclick="randomize('class')">Randomize</button>
+        <button onclick="nextPage('page-background')">Next</button>
+    </div>
+
+    <div id="page-background" class="page">
+        <h2>Background</h2>
+        <h3 id="display-background">Criminal</h3>
+        <button onclick="randomize('background')">Randomize</button>
+        <button onclick="nextPage('page-complete')">Finish</button>
+    </div>
+
+    <div id="page-complete" class="page">
+        <h2>Your Character</h2>
+        <div class="result-box" id="final-summary"></div>
+        <button onclick="location.reload()">Generate New</button>
+    </div>
+</div>
+
+<script>
+    const data = {
+        races: ["Human", "Elf", "Dwarf", "Halfling", "Tiefling", "Dragonborn", "Half-Orc"],
+        genders: ["Male", "Female", "Non-Binary", "Agender"],
+        classes: ["Fighter", "Wizard", "Rogue", "Cleric", "Barbarian", "Bard", "Paladin"],
+        backgrounds: ["Acolyte", "Criminal", "Soldier", "Sage", "Charlatan", "Hermit"],
+        stats: ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"]
+    };
+
+    let character = {
+        race: "Human",
+        gender: "Non-Binary",
+        stats: { Strength: 10, Dexterity: 10, Constitution: 10, Intelligence: 10, Wisdom: 10, Charisma: 10 },
+        class: "Fighter",
+        background: "Criminal"
+    };
+
+    function nextPage(pageId) {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById(pageId).classList.add('active');
+        if(pageId === 'page-complete') showFinal();
+    }
+
+    function randomize(type) {
+        if(type === 'stats') {
+            data.stats.forEach(s => character.stats[s] = Math.floor(Math.random() * 11) + 8);
+            renderStats();
+        } else {
+            const arr = data[type + 's'] || data[type];
+            character[type] = arr[Math.floor(Math.random() * arr.length)];
+            document.getElementById('display-' + type).innerText = character[type];
         }
+    }
 
-        function update() {
-            if (gameOver) return;
-
-            // Physics
-            player.dy += 0.6; // Gravity
-            player.y += player.dy;
-
-            if (player.y + player.height > 200) {
-                player.y = 200 - player.height;
-                player.jumping = false;
-            }
-
-            // Obstacles
-            if (Math.random() < 0.02) {
-                obstacles.push({ x: 800, width: 30, height: 40 });
-            }
-
-            for (let i = 0; i < obstacles.length; i++) {
-                obstacles[i].x -= 5;
-
-                // Collision
-                if (
-                    player.x < obstacles[i].x + obstacles[i].width &&
-                    player.x + player.width > obstacles[i].x &&
-                    player.y + player.height > 200 - obstacles[i].height
-                ) {
-                    gameOver = true;
-                }
-
-                if (obstacles[i].x + obstacles[i].width < 0) {
-                    obstacles.splice(i, 1);
-                    score++;
-                }
-            }
-
-            draw();
-            requestAnimationFrame(update);
+    function renderStats() {
+        const container = document.getElementById('stat-container');
+        container.innerHTML = '';
+        for(let stat in character.stats) {
+            container.innerHTML += `
+                <div class="stat-row">
+                    <label>${stat}:</label>
+                    <input type="number" class="stat-input" value="${character.stats[stat]}" 
+                    onchange="character.stats['${stat}'] = this.value">
+                </div>`;
         }
+    }
 
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+    function showFinal() {
+        let statsText = Object.entries(character.stats).map(([k,v]) => `${k}: ${v}`).join('<br>');
+        document.getElementById('final-summary').innerHTML = `
+            <p><strong>Race:</strong> ${character.race}</p>
+            <p><strong>Gender:</strong> ${character.gender}</p>
+            <p><strong>Class:</strong> ${character.class}</p>
+            <p><strong>Background:</strong> ${character.background}</p>
+            <p><strong>Stats:</strong><br>${statsText}</p>
+        `;
+    }
 
-            // Draw Player
-            ctx.fillStyle = "#00FF00";
-            ctx.fillRect(player.x, player.y, player.width, player.height);
+    // Initialize
+    renderStats();
+</script>
 
-            // Draw Obstacles
-            ctx.fillStyle = "#FF0000";
-            obstacles.forEach(o => ctx.fillRect(o.x, 200 - o.height, o.width, o.height));
-
-            // Draw Score
-            ctx.fillStyle = "white";
-            ctx.fillText("Score: " + score, 10, 20);
-
-            if (gameOver) {
-                ctx.fillText("GAME OVER - Press Space to Restart", 300, 100);
-            }
-        }
-
-        update();
-    </script>
 </body>
 </html>
